@@ -19,25 +19,20 @@ class _SplashScreenState extends State<SplashScreen> {
     _jalankanSplashScreen();
   }
 
-  // Fungsi untuk memberi jeda animasi sekaligus mengecek status login
   Future<void> _jalankanSplashScreen() async {
-    // 1. Beri waktu animasi Lottie untuk tampil (misal: 3 detik)
     await Future.delayed(const Duration(seconds: 3));
-
-    // 2. Cek apakah siswa sudah memiliki token (sudah login sebelumnya)
     String? token = await SecureStorageHelper.getToken();
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
-    // 3. Arahkan ke layar yang tepat
     if (token != null && token.isNotEmpty) {
-      // Jika token ada, langsung masuk ke Home
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
     } else {
-      // Jika belum login, arahkan ke halaman Login
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -48,13 +43,11 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-          Colors.blue[600], // Warna latar belakang khas aplikasi Anda
+      backgroundColor: Colors.blue[600],
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Container untuk Animasi Lottie
             Container(
               width: 250,
               height: 250,
@@ -75,7 +68,6 @@ class _SplashScreenState extends State<SplashScreen> {
                   child: Lottie.asset(
                     'assets/animations/splash.json',
                     fit: BoxFit.contain,
-                    // Fallback jika file lottie belum dimasukkan
                     errorBuilder: (context, error, stackTrace) {
                       return const Icon(Icons.school_rounded,
                           size: 100, color: Colors.blue);
@@ -85,8 +77,6 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             const SizedBox(height: 40),
-
-            // Nama Aplikasi
             const Text(
               'Geofence App',
               style: TextStyle(
@@ -97,8 +87,6 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             const SizedBox(height: 8),
-
-            // Subtitle atau Slogan
             Text(
               'Sistem Presensi Pintar',
               style: TextStyle(
@@ -111,7 +99,6 @@ class _SplashScreenState extends State<SplashScreen> {
           ],
         ),
       ),
-      // Footer / Copyright di bagian bawah layar
       bottomNavigationBar: BottomAppBar(
         color: Colors.transparent,
         elevation: 0,

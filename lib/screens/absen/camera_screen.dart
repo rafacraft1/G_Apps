@@ -34,6 +34,9 @@ class _CameraScreenState extends State<CameraScreen> {
   bool _isLoading = true;
   Position? _posisi;
 
+  // PERBAIKAN: Variabel untuk mengunci status Fake GPS sejak awal pemindaian
+  bool _isFakeGpsDetected = false;
+
   String _statusLoading = "Mencari Satelit GPS...";
 
   @override
@@ -47,7 +50,12 @@ class _CameraScreenState extends State<CameraScreen> {
       if (mounted) {
         setState(() => _statusLoading = "Memindai Titik Koordinat Anda...");
       }
-      _posisi = await LocationHelper.getCurrentLocation();
+
+      // PERBAIKAN: Gunakan fungsi withMockStatus agar flag Fake GPS langsung tertangkap
+      Map<String, dynamic> locationData =
+          await LocationHelper.getCurrentLocationWithMockStatus();
+      _posisi = locationData['position'] as Position;
+      _isFakeGpsDetected = locationData['is_mocked'] as bool;
 
       if (mounted) {
         setState(() => _statusLoading = "Menghitung Jarak ke Sekolah...");
@@ -106,8 +114,8 @@ class _CameraScreenState extends State<CameraScreen> {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12))),
                   onPressed: () {
-                    Navigator.pop(context); // Tutup dialog
-                    Navigator.pop(context); // Kembali ke Home
+                    Navigator.pop(context);
+                    Navigator.pop(context);
                   },
                   child: const Text('Mengerti',
                       style:
@@ -142,8 +150,8 @@ class _CameraScreenState extends State<CameraScreen> {
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Error GPS: $e'), backgroundColor: Colors.red));
       }
     }
   }
@@ -257,10 +265,8 @@ class _CameraScreenState extends State<CameraScreen> {
                             Navigator.of(context, rootNavigator: true);
                         final navigatorLokal = Navigator.of(context);
 
-                        // 1. Tutup BottomSheet Preview Foto
                         Navigator.pop(sheetContext);
 
-                        // 2. Tampilkan Dialog Loading
                         showDialog(
                           context: context,
                           barrierDismissible: false,
@@ -286,21 +292,18 @@ class _CameraScreenState extends State<CameraScreen> {
                         );
 
                         try {
-                          // === PERBAIKAN: Menambahkan argumen isMocked di sini ===
+                          // PERBAIKAN: Menggunakan flag yang dikunci saat inisialisasi
                           final sukses = await absenProvider.kirimAbsen(
                             foto: foto,
                             lat: lat,
                             lon: lon,
-                            isMocked:
-                                _posisi?.isMocked ?? false, // Deteksi Fake GPS
+                            isMocked: _isFakeGpsDetected,
                             tipeAbsen: widget.tipeAbsen,
                           );
 
-                          // 3. Tutup Dialog Loading secara aman
                           navigatorRoot.pop();
 
                           if (sukses && mounted) {
-                            // 4. Tutup CameraScreen
                             navigatorLokal.pop();
 
                             scaffoldMessenger.showSnackBar(
@@ -311,13 +314,11 @@ class _CameraScreenState extends State<CameraScreen> {
                             );
                           }
                         } catch (e) {
-                          // Tutup Dialog Loading secara aman JIKA TERJADI ERROR
                           navigatorRoot.pop();
 
                           if (mounted) {
                             String pesanError = e.toString();
 
-                            // === TAMBAHAN: Tampilkan Peringatan Khusus Jika Fake GPS Terdeteksi ===
                             if (pesanError.toLowerCase().contains('fake gps') ||
                                 pesanError.toLowerCase().contains('diblokir')) {
                               showDialog(
@@ -351,25 +352,21 @@ class _CameraScreenState extends State<CameraScreen> {
                                           backgroundColor: Colors.red,
                                           foregroundColor: Colors.white),
                                       onPressed: () {
-                                        Navigator.pop(
-                                            context); // Tutup dialog peringatan
-                                        navigatorLokal
-                                            .pop(); // Keluar dari layar kamera kembali ke Home
+                                        Navigator.pop(context);
+                                        navigatorLokal.pop();
                                       },
                                       child: const Text('Mengerti'),
                                     )
                                   ],
                                 ),
                               );
-                              return; // Hentikan eksekusi setelah menampilkan dialog
+                              return;
                             }
 
-                            // Jika error biasa (bukan Fake GPS), tampilkan SnackBar
                             scaffoldMessenger.showSnackBar(SnackBar(
                                 content: Text(pesanError),
                                 backgroundColor: Colors.red));
 
-                            // Auto-Logout jika Sesi Expired
                             if (pesanError.toLowerCase().contains('token') ||
                                 pesanError.toLowerCase().contains('sesi')) {
                               await SecureStorageHelper.clearAll();

@@ -7,8 +7,9 @@ class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
   late Dio dio;
 
+  // Pastikan URL mengarah ke folder /api
   final String baseUrl =
-      dotenv.env['BASE_URL'] ?? 'http://192.168.0.105:8080/api/v1';
+      dotenv.env['BASE_URL'] ?? 'http://192.168.0.105:8080/api';
 
   factory ApiClient() {
     return _instance;
@@ -44,21 +45,26 @@ class ApiClient {
 
   static Future<Map<String, dynamic>?> getServerData() async {
     try {
-      final response = await ApiClient().dio.get('/waktu_server');
-      if (response.data != null && response.data['status'] == 'success') {
+      // Pastikan endpoint sesuai dengan rute di CI4
+      final response = await ApiClient().dio.get('/waktu');
+
+      if (response.data != null &&
+          (response.data['status'] == 200 ||
+              response.data['status'] == 'success')) {
+        // PERBAIKAN: Ambil payload dari dalam object 'data'
+        var payload = response.data['data'];
+
         return {
-          'waktu': DateTime.parse(response.data['waktu']),
-          // --- TAMBAHAN BARU: Menangkap Status Libur ---
-          'is_libur': response.data['is_libur'] ?? false,
-          'nama_libur': response.data['nama_libur'] ?? '',
-          // ---------------------------------------------
-          'jam_masuk': response.data['jam_masuk'],
-          'jam_pulang': response.data['jam_pulang'],
+          'waktu': DateTime.parse(payload['waktu']),
+          'is_libur': payload['is_libur'] == 1 || payload['is_libur'] == true,
+          'nama_libur': payload['nama_libur'] ?? '',
+          'jam_masuk': payload['jam_masuk'],
+          'jam_pulang': payload['jam_pulang'],
           'lat_sekolah':
-              double.tryParse(response.data['lat_sekolah'].toString()) ?? 0.0,
+              double.tryParse(payload['lat_sekolah'].toString()) ?? 0.0,
           'lon_sekolah':
-              double.tryParse(response.data['lon_sekolah'].toString()) ?? 0.0,
-          'radius': double.tryParse(response.data['radius'].toString()) ?? 50.0,
+              double.tryParse(payload['lon_sekolah'].toString()) ?? 0.0,
+          'radius': double.tryParse(payload['radius'].toString()) ?? 50.0,
         };
       }
     } catch (e) {

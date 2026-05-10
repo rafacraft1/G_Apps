@@ -5,18 +5,22 @@ import '../../profile/profile_screen.dart';
 
 class HomeHeader extends StatelessWidget {
   final String namaSiswa;
-  final String? fotoUrl; // <-- Tambahan Parameter Foto
+  final String? fotoUrl;
   final DateTime? waktuServer;
   final VoidCallback onRiwayatTap;
   final VoidCallback onLogoutTap;
 
+  // PERBAIKAN: Tambahkan parameter callback untuk trigger refresh dari HomeScreen
+  final VoidCallback onRefreshProfile;
+
   const HomeHeader({
     super.key,
     required this.namaSiswa,
-    this.fotoUrl, // <-- Tambahan Parameter Foto
+    this.fotoUrl,
     required this.waktuServer,
     required this.onRiwayatTap,
     required this.onLogoutTap,
+    required this.onRefreshProfile, // Wajibkan parameter ini
   });
 
   String _formatTanggalSingkat(DateTime dt) {
@@ -37,7 +41,6 @@ class HomeHeader extends StatelessWidget {
     return "${dt.day} ${bulan[dt.month - 1]} ${dt.year}";
   }
 
-  // === FUNGSI KONVERSI URL DARI .ENV (Sama seperti di Profile) ===
   String _getValidFotoUrl(String? originalUrl) {
     if (originalUrl == null || originalUrl.isEmpty) return '';
     try {
@@ -119,11 +122,14 @@ class HomeHeader extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: () async {
-                  // Await navigator agar saat kembali dari profile, home_screen me-refresh foto
+                  // PERBAIKAN: Pindah halaman, lalu jalankan fungsi refresh setelah kembali
                   await Navigator.push(
                       context,
                       MaterialPageRoute(
                           builder: (context) => const ProfileScreen()));
+
+                  // Panggil fungsi setState dari HomeScreen untuk memperbarui foto UI
+                  onRefreshProfile();
                 },
                 child: CircleAvatar(
                   radius: 25,

@@ -7,7 +7,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/utils/secure_storage_helper.dart';
 
-// Import Widget yang baru kita buat
+import '../auth/login_screen.dart';
 import 'widgets/profile_card.dart';
 import 'widgets/security_menu.dart';
 
@@ -35,13 +35,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final nama = await SecureStorageHelper.getUserName();
     final foto = await SecureStorageHelper.getFotoProfile();
 
+    if (!mounted) {
+      return;
+    }
+
     setState(() {
       _namaSiswa = nama ?? 'Siswa';
       _fotoUrl = foto;
     });
   }
 
-  // === FUNGSI KONVERSI URL DARI .ENV ===
   String _getValidFotoUrl(String? originalUrl) {
     if (originalUrl == null || originalUrl.isEmpty) return '';
     try {
@@ -53,35 +56,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
           '${apiUri.scheme}://${apiUri.host}${apiUri.hasPort ? ':${apiUri.port}' : ''}';
       Uri fotoUri = Uri.parse(originalUrl);
 
-      return '$validHost${fotoUri.path}?v=${DateTime.now().millisecondsSinceEpoch}';
+      return '$validHost${fotoUri.path}';
     } catch (e) {
       return originalUrl;
     }
   }
 
-  // === FUNGSI UBAH FOTO PROFIL ===
   Future<void> _pilihDanUploadFoto() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
     try {
       final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 70,
-        maxWidth: 800,
-      );
+          source: ImageSource.gallery, imageQuality: 70);
 
-      if (image == null) return;
+      if (image == null) {
+        return;
+      }
 
-      setState(() => _isUploadingFoto = true);
-      File fileFoto = File(image.path);
-      String urlBaru = await authProvider.uploadFotoProfil(fileFoto);
-
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
-        _fotoUrl = urlBaru;
+        _isUploadingFoto = true;
+      });
+
+      if (!mounted) {
+        return;
+      }
+
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final newUrl = await authProvider.uploadFotoProfil(File(image.path));
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _fotoUrl = newUrl;
         _isUploadingFoto = false;
       });
+
+      if (!mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -89,92 +105,141 @@ class _ProfileScreenState extends State<ProfileScreen> {
             backgroundColor: Colors.green),
       );
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _isUploadingFoto = false);
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isUploadingFoto = false;
+      });
+
+      if (!mounted) {
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Gagal mengunggah foto: $e'),
-            backgroundColor: Colors.red),
+        SnackBar(content: Text('Gagal: $e'), backgroundColor: Colors.red),
       );
     }
   }
 
-  // === FUNGSI RESET DEVICE ===
   void _ajukanReset() {
     final TextEditingController alasanController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Ajukan Reset Device',
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text('Reset Penguncian HP?',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: alasanController,
-          decoration: InputDecoration(
-            hintText: 'Tuliskan alasan ganti HP...',
-            filled: true,
-            fillColor: Colors.grey[50],
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Fitur ini digunakan jika Anda berganti HP. Admin akan mereview permohonan Anda sebelum disetujui.',
+              style: TextStyle(fontSize: 13),
             ),
-          ),
-          maxLines: 3,
+            const SizedBox(height: 16),
+            TextField(
+              controller: alasanController,
+              decoration: InputDecoration(
+                labelText: 'Alasan Ganti HP',
+                hintText: 'Contoh: HP lama rusak',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              maxLines: 2,
+            ),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Batal',
-                style:
-                    TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Batal'),
           ),
           ElevatedButton(
             onPressed: () async {
-              if (alasanController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('Alasan tidak boleh kosong!',
-                        style: TextStyle(color: Colors.white)),
-                    backgroundColor: Colors.red));
+              final alasan = alasanController.text.trim();
+              if (alasan.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Alasan wajib diisi!')),
+                );
                 return;
               }
 
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
 
               showDialog(
                 context: context,
                 barrierDismissible: false,
-                builder: (context) => const Center(
-                    child: CircularProgressIndicator(color: Colors.blue)),
+                builder: (loadContext) =>
+                    const Center(child: CircularProgressIndicator()),
               );
 
               try {
+                if (!mounted) {
+                  return;
+                }
+
                 final authProvider =
                     Provider.of<AuthProvider>(context, listen: false);
-                final sukses =
-                    await authProvider.ajukanResetDevice(alasanController.text);
 
-                if (!context.mounted) return;
+                final sukses = await authProvider.ajukanResetDevice(alasan);
+
+                if (!mounted) {
+                  return;
+                }
+
                 Navigator.pop(context);
 
                 if (sukses) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text(
-                          'Pengajuan berhasil dikirim! Menunggu persetujuan Admin.'),
-                      backgroundColor: Colors.green));
+                  if (!mounted) {
+                    return;
+                  }
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text(
+                            'Pengajuan berhasil dikirim! Silakan hubungi admin.'),
+                        backgroundColor: Colors.green),
+                  );
+
+                  await SecureStorageHelper.clearAll();
+
+                  if (!mounted) {
+                    return;
+                  }
+
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const LoginScreen()),
+                    (route) => false,
+                  );
                 }
               } catch (e) {
-                if (!context.mounted) return;
+                if (!mounted) {
+                  return;
+                }
+
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(e.toString()), backgroundColor: Colors.red));
+
+                if (!mounted) {
+                  return;
+                }
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                      content: Text(e.toString()), backgroundColor: Colors.red),
+                );
               }
             },
             style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue[600],
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8))),
+                backgroundColor: Colors.orange[600],
+                foregroundColor: Colors.white),
             child: const Text('Kirim Pengajuan'),
           ),
         ],
@@ -188,47 +253,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: Colors.grey[50],
       body: Stack(
         children: [
-          // Background Gradient
-          Container(
-            height: 260,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.blue[800]!, Colors.blue[500]!],
-              ),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(40),
-                bottomRight: Radius.circular(40),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: 220,
+              decoration: BoxDecoration(
+                color: Colors.blue[700],
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(40),
+                  bottomRight: Radius.circular(40),
+                ),
               ),
             ),
           ),
-
           SafeArea(
-            bottom: false,
             child: Column(
               children: [
-                // Custom App Bar
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0, vertical: 8.0),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                              color: Colors.white, size: 20),
-                          onPressed: () => Navigator.pop(context),
-                        ),
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
                       ),
+                      const SizedBox(width: 8),
                       const Text(
-                        'Profil Saya',
+                        'Profil Siswa',
                         style: TextStyle(
                             color: Colors.white,
                             fontSize: 18,
@@ -240,8 +294,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-
-                // Konten Utama
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
@@ -249,7 +301,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 24.0),
                       child: Column(
                         children: [
-                          // Memanggil Widget ProfileCard
                           ProfileCard(
                             namaSiswa: _namaSiswa,
                             fotoUrl: _fotoUrl,
@@ -258,8 +309,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             getValidUrl: _getValidFotoUrl,
                           ),
                           const SizedBox(height: 32),
-
-                          // Memanggil Widget SecurityMenu
                           SecurityMenu(onResetTap: _ajukanReset),
                           const SizedBox(height: 40),
                         ],

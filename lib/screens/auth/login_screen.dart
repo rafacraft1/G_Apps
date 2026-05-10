@@ -18,14 +18,12 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _nisController = TextEditingController();
   final FocusNode _nisFocusNode = FocusNode();
 
-  // --- VARIABEL UNTUK ANIMASI ---
-  bool _isVisible = false; // Untuk animasi card masuk
-  bool _isButtonPushed = false; // Untuk efek bouncing tombol
+  bool _isVisible = false;
+  bool _isButtonPushed = false;
 
   @override
   void initState() {
     super.initState();
-    // Memicu animasi munculnya Card setelah layar dirender
     WidgetsBinding.instance.addPostFrameCallback((_) {
       setState(() {
         _isVisible = true;
@@ -160,7 +158,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final navigatorLokal = Navigator.of(context);
 
     bool diizinkan = await _mintaSemuaIzin();
-    if (!diizinkan) return;
+
+    if (!diizinkan) {
+      return;
+    }
 
     try {
       final sukses = await authProvider.login(nis);
@@ -195,7 +196,6 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: const Color(0xFFF8FAFC),
       body: Stack(
         children: [
-          // --- BACKGROUND ATAS (GRADIENT BIRU) ---
           Container(
             height: size.height * 0.45,
             width: double.infinity,
@@ -238,8 +238,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
           ),
-
-          // --- KONTEN UTAMA ---
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
@@ -247,7 +245,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // LOGO DAN JUDUL
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -282,8 +279,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 40),
-
-                    // --- KARTU FORM LOGIN DENGAN ANIMASI FADE & SLIDE ---
                     AnimatedOpacity(
                       duration: const Duration(milliseconds: 800),
                       opacity: _isVisible ? 1.0 : 0.0,
@@ -292,7 +287,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         duration: const Duration(milliseconds: 800),
                         curve: Curves.easeOutCubic,
                         transform: Matrix4.translationValues(
-                            0, _isVisible ? 0 : 50, 0), // Efek geser dari bawah
+                            0, _isVisible ? 0 : 50, 0),
                         margin: const EdgeInsets.symmetric(horizontal: 28),
                         padding: const EdgeInsets.all(32),
                         decoration: BoxDecoration(
@@ -327,8 +322,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(height: 32),
-
-                            // LABEL INPUT
                             const Text(
                               'NIS Siswa',
                               style: TextStyle(
@@ -339,8 +332,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(height: 10),
-
-                            // INPUT FIELD
                             TextFormField(
                               controller: _nisController,
                               focusNode: _nisFocusNode,
@@ -393,25 +384,20 @@ class _LoginScreenState extends State<LoginScreen> {
                               onTap: () => setState(() {}),
                             ),
                             const SizedBox(height: 32),
-
-                            // --- TOMBOL LOGIN DENGAN EFEK BOUNCING ---
                             Consumer<AuthProvider>(
                               builder: (context, authProvider, child) {
                                 return Listener(
-                                  // Mendeteksi saat jari menyentuh tombol
                                   onPointerDown: (_) {
                                     if (!authProvider.isLoading) {
                                       setState(() => _isButtonPushed = true);
                                     }
                                   },
-                                  // Mendeteksi saat jari dilepas dari tombol
                                   onPointerUp: (_) {
                                     if (!authProvider.isLoading) {
                                       setState(() => _isButtonPushed = false);
                                     }
                                   },
                                   child: AnimatedScale(
-                                    // Skala mengecil 5% saat ditekan
                                     scale: _isButtonPushed ? 0.95 : 1.0,
                                     duration: const Duration(milliseconds: 100),
                                     curve: Curves.easeInOut,
@@ -476,8 +462,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 32),
-
-                    // FOOTER TEXT (Ikut transisi animasi Fade)
                     AnimatedOpacity(
                       duration: const Duration(milliseconds: 1000),
                       opacity: _isVisible ? 1.0 : 0.0,

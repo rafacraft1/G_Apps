@@ -10,15 +10,19 @@ class PengumumanProvider with ChangeNotifier {
 
   Future<void> fetchPengumuman() async {
     _isLoading = true;
-    // Beritahu UI kalau kita sedang loading
     Future.microtask(() => notifyListeners());
 
     try {
-      // Panggil endpoint /pengumuman dari CodeIgniter
       final response = await ApiClient().dio.get('/pengumuman');
 
-      if (response.data != null && response.data['status'] == 'success') {
-        _listPengumuman = response.data['data']; // Simpan array pengumumannya
+      if (response.statusCode == 200 && response.data != null) {
+        // PERBAIKAN: Menambahkan pengecekan key 'status' dan null safety '?? []'
+        if (response.data['status'] == 200 ||
+            response.data['status'] == 'success') {
+          _listPengumuman = response.data['data'] ?? [];
+        } else {
+          _listPengumuman = [];
+        }
       } else {
         _listPengumuman = [];
       }
@@ -27,7 +31,7 @@ class PengumumanProvider with ChangeNotifier {
       _listPengumuman = [];
     } finally {
       _isLoading = false;
-      notifyListeners(); // Beritahu UI bahwa data sudah siap dan loading selesai
+      notifyListeners();
     }
   }
 }

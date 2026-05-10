@@ -17,10 +17,10 @@ class AbsensiProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await ApiClient().dio.get('/absen/riwayat');
+      // PERBAIKAN: Sesuaikan penamaan endpoint dengan standar CI4
+      final response = await ApiClient().dio.get('/absensi/riwayat');
 
       if (response.statusCode == 200 && response.data != null) {
-        // Karena response JSON sudah berformat { status: 200, message: '...', data: [...] }
         _listRiwayat = response.data['data'] ?? [];
       } else {
         _listRiwayat = [];
@@ -36,7 +36,7 @@ class AbsensiProvider with ChangeNotifier {
 
   Future<Map<String, dynamic>?> cekAbsenHariIni(String tanggal) async {
     try {
-      final response = await ApiClient().dio.get('/absen/riwayat');
+      final response = await ApiClient().dio.get('/absensi/riwayat');
 
       if (response.statusCode == 200 && response.data != null) {
         List data = response.data['data'] ?? [];
@@ -48,13 +48,11 @@ class AbsensiProvider with ChangeNotifier {
       }
       return null;
     } on DioException catch (e) {
-      debugPrint('Gagal cek riwayat hari ini: $e');
       if (e.response?.statusCode == 401) {
         throw 'sesi_habis';
       }
       return null;
     } catch (e) {
-      debugPrint('Error: $e');
       return null;
     }
   }
@@ -83,42 +81,35 @@ class AbsensiProvider with ChangeNotifier {
           compressedFile != null ? File(compressedFile.path) : foto;
 
       List<int> imageBytes = await finalFile.readAsBytes();
-      String base64Foto = base64Encode(imageBytes);
+      String base64Foto = "data:image/jpeg;base64,${base64Encode(imageBytes)}";
 
-      // KUNCI: Key Form Data harus sesuai dengan yang ditangkap di AbsensiApi.php
+      // PERBAIKAN: Penamaan Key wajib persis dengan validator CI4
       FormData formData = FormData.fromMap({
-        'lat': lat.toString(),
-        'long': lon.toString(),
-        'is_mock': isMocked ? 'true' : 'false',
+        'latitude': lat.toString(),
+        'longitude': lon.toString(),
+        'is_fake_gps': isMocked ? 1 : 0,
         'foto': base64Foto,
       });
 
       final response = await ApiClient().dio.post(
-            '/absen/$tipeAbsen',
+            '/absensi/$tipeAbsen',
             data: formData,
           );
 
-      if (response.statusCode == 201 || // Status code Created
-          response.statusCode == 200 ||
-          response.data['status'] == 200 ||
-          response.data['status'] == 'success') {
+      if (response.statusCode == 201 || response.statusCode == 200) {
         return true;
       } else {
         throw response.data['message'] ?? 'Terjadi kesalahan sistem.';
       }
     } on DioException catch (e) {
-      debugPrint('Error API Absen: ${e.response?.data}');
-
       String pesanError = 'Gagal menghubungi server.';
       if (e.response?.data != null && e.response?.data is Map) {
-        // Ambil struktur error CI4
         pesanError = e.response?.data['message'] ??
             e.response?.data['messages']?['error'] ??
             pesanError;
       }
       throw pesanError;
     } catch (e) {
-      debugPrint('Error Kompresi/Absen: $e');
       throw 'Terjadi kesalahan saat memproses absensi.';
     }
   }
