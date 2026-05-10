@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "725466006351",
+    "firebase_url": "https://geofenceappv2-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "geofenceappv2",
+    "storage_bucket": "geofenceappv2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:725466006351:android:ff8637bd2ceb5c01507b3a",
+        "android_client_info": {
+          "package_name": "com.example.geofence_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDRcsBGaG2QzVNMos_LvBC4rAAo-dZj4Ig"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
