@@ -9,7 +9,7 @@ class ApiClient {
 
   // Pastikan URL mengarah ke folder /api
   final String baseUrl =
-      dotenv.env['BASE_URL'] ?? 'http://192.168.0.105:8080/api';
+      dotenv.env['BASE_URL'] ?? 'http://192.168.0.105:8080/api/v1';
 
   factory ApiClient() {
     return _instance;
@@ -46,7 +46,7 @@ class ApiClient {
   static Future<Map<String, dynamic>?> getServerData() async {
     try {
       // Pastikan endpoint sesuai dengan rute di CI4
-      final response = await ApiClient().dio.get('/waktu');
+      final response = await ApiClient().dio.get('/waktu_server');
 
       if (response.data != null &&
           (response.data['status'] == 200 ||
