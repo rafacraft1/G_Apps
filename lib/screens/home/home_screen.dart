@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:dio/dio.dart'; // Dibutuhkan untuk FormData
+import 'package:firebase_messaging/firebase_messaging.dart'; // <-- IMPORT FCM BARU
 
 import '../../core/api/api_client.dart';
 import '../../core/utils/secure_storage_helper.dart';
@@ -50,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadProfileData();
+    _updateFCMToken(); // <-- EKSEKUSI PEMBARUAN TOKEN OTOMATIS SAAT BERANDA DIBUKA
     _refreshSemuaData();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -65,6 +68,22 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  // ====================================================================
+  // FUNGSI SILUMAN: Memperbarui Token FCM ke Database CI4 Tanpa Terlihat
+  // ====================================================================
+  Future<void> _updateFCMToken() async {
+    try {
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null) {
+        FormData formData = FormData.fromMap({'fcm_token': fcmToken});
+        await ApiClient().dio.post('/fcm/updateToken', data: formData);
+        debugPrint("Sinkronisasi Token FCM Berhasil: $fcmToken");
+      }
+    } catch (e) {
+      debugPrint('Gagal sinkronisasi token FCM: $e');
+    }
   }
 
   Future<void> _loadProfileData() async {
@@ -276,9 +295,6 @@ class _HomeScreenState extends State<HomeScreen> {
             }
           }
         } else {
-          // ====================================================================
-          // LOGIKA CERDAS: Deteksi Status Sakit/Izin/Dispensasi dari Database
-          // ====================================================================
           String statusAbsenServer = _dataAbsenHariIni!['status'] ?? '';
 
           if (statusAbsenServer == 'Sakit' || statusAbsenServer == 'Izin') {
@@ -293,29 +309,27 @@ class _HomeScreenState extends State<HomeScreen> {
             iconTombol = statusAbsenServer == 'Sakit'
                 ? Icons.medical_services_rounded
                 : Icons.info_outline_rounded;
-            isTombolDisable = true; // Kunci tombol
+            isTombolDisable = true;
           }
-          // --- LOGIKA BYPASS DISPENSASI ---
+          // LOGIKA BYPASS DISPENSASI
           else if (statusAbsenServer == 'Dispensasi') {
             statusHariIni = 'Dispensasi Luar';
             warnaStatus = Colors.teal;
 
             if (_dataAbsenHariIni!['jam_masuk'] == null) {
-              tipeAbsen =
-                  'masuk_dispensasi'; // Parameter khusus ke API & Kamera
+              tipeAbsen = 'masuk_dispensasi';
               labelTombol = 'Absen Lokasi Kegiatan';
               subLabel = 'Ketuk untuk kirim bukti tiba';
               warnaTombol = Colors.teal;
               iconTombol = Icons.pin_drop_rounded;
-              isTombolDisable = false; // BUKA KUNCI TOMBOL!
+              isTombolDisable = false;
             } else if (_dataAbsenHariIni!['jam_pulang'] == null) {
-              tipeAbsen =
-                  'pulang_dispensasi'; // Parameter khusus ke API & Kamera
+              tipeAbsen = 'pulang_dispensasi';
               labelTombol = 'Absen Pulang Kegiatan';
               subLabel = 'Ketuk jika acara selesai';
               warnaTombol = Colors.orange;
               iconTombol = Icons.directions_run_rounded;
-              isTombolDisable = false; // BUKA KUNCI TOMBOL!
+              isTombolDisable = false;
             } else {
               statusHariIni = 'Hadir (Dispensasi)';
               labelTombol = 'Tugas Selesai';
@@ -324,10 +338,7 @@ class _HomeScreenState extends State<HomeScreen> {
               iconTombol = Icons.verified_rounded;
               isTombolDisable = true;
             }
-          }
-          // -----------------------------------
-          // Jika statusnya bukan Sakit/Izin/Dispensasi, lanjutkan ke logika Absen Pulang
-          else if (_dataAbsenHariIni!['jam_pulang'] == null) {
+          } else if (_dataAbsenHariIni!['jam_pulang'] == null) {
             tipeAbsen = 'pulang';
             statusHariIni = 'Belum Absen Pulang';
             warnaStatus = Colors.blue;

@@ -22,14 +22,12 @@ import 'screens/splash/splash_screen.dart';
 Future<void> _prosesSinyalTracking(RemoteMessage message, String tipe) async {
   debugPrint("Sinyal Ping $tipe Diterima: ${message.data}");
 
-  // PERBAIKAN 1: Sesuaikan dengan payload dari Web Admin CI4
+  // PERBAIKAN 1: Sesuaikan dengan payload yang dikirim dari Admin CI4
   if (message.data['action'] == 'fetch_location') {
     try {
-      // 1. Cek Token Siswa (Agar tahu siapa yg dilacak)
       String? token = await SecureStorageHelper.getToken();
       if (token == null) return;
 
-      // 2. Tembak Lokasi Asli secara diam-diam
       Position posisi = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
@@ -37,7 +35,6 @@ Future<void> _prosesSinyalTracking(RemoteMessage message, String tipe) async {
       String baseUrl =
           dotenv.env['BASE_URL'] ?? 'http://192.168.0.105:8080/api/v1';
 
-      // 3. Kirim ke Backend CI4
       Dio dio = Dio(BaseOptions(
         baseUrl: baseUrl,
         connectTimeout: const Duration(seconds: 15),
@@ -48,7 +45,7 @@ Future<void> _prosesSinyalTracking(RemoteMessage message, String tipe) async {
         'long': posisi.longitude,
       });
 
-      // PERBAIKAN 2: Sesuaikan endpoint dengan TrackingApi.php
+      // PERBAIKAN 2: Sesuaikan rute dengan TrackingApi.php di backend
       await dio.post(
         '/tracking/updateLokasi',
         data: formData,
@@ -68,36 +65,25 @@ Future<void> _prosesSinyalTracking(RemoteMessage message, String tipe) async {
 }
 
 // =====================================================================
-// ⚠️ BACKGROUND HANDLER (WAJIB DI LUAR CLASS, HARUS TOP-LEVEL FUNCTION)
+// BACKGROUND HANDLER (WAJIB TOP-LEVEL FUNCTION)
 // =====================================================================
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Pastikan Firebase aktif walau UI tidak jalan
   await Firebase.initializeApp();
-
-  // Load DOTENV di background agar Base URL terbaca
   await dotenv.load(fileName: ".env");
-
-  // Lemparkan ke fungsi inti
   await _prosesSinyalTracking(message, "Latar Belakang (Background)");
 }
 
 void main() async {
-  // Pastikan core Flutter sudah jalan sebelum panggil Firebase
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Load DOTENV di foreground
   await dotenv.load(fileName: ".env");
-
-  // Inisialisasi Firebase
   await Firebase.initializeApp();
 
-  // 1. Daftarkan PINTU BELAKANG (Aplikasi Ditutup / Berjalan di Background)
+  // 1. Daftarkan PINTU BELAKANG
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // 2. Daftarkan PINTU DEPAN (Aplikasi Sedang Dibuka / Foreground)
+  // 2. Daftarkan PINTU DEPAN
   FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-    // Lemparkan ke fungsi inti
     await _prosesSinyalTracking(message, "Layar Aktif (Foreground)");
   });
 
