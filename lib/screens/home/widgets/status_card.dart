@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shimmer/shimmer.dart';
 
 class StatusCard extends StatelessWidget {
   final bool isMemuat;
@@ -8,8 +7,6 @@ class StatusCard extends StatelessWidget {
   final DateTime? waktuServer;
   final String jamMasukServer;
   final String jamPulangServer;
-
-  // Parameter Lokasi
   final double? jarakMeter;
   final bool isMemuatLokasi;
 
@@ -25,161 +22,190 @@ class StatusCard extends StatelessWidget {
     required this.isMemuatLokasi,
   });
 
-  String _formatJamMenit(String jamLengkap) {
-    try {
-      final parts = jamLengkap.split(':');
-      return "${parts[0]}:${parts[1]}";
-    } catch (e) {
-      return jamLengkap;
-    }
-  }
-
-  Widget _buildShimmer({required double width, required double height}) {
-    return Shimmer.fromColors(
-      baseColor: Colors.grey[300]!,
-      highlightColor: Colors.grey[100]!,
-      child: Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-              color: Colors.white, borderRadius: BorderRadius.circular(4))),
-    );
-  }
-
-  Widget _buildInfoJam(
-      IconData icon, String label, String waktu, MaterialColor color) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10)),
-          child: Icon(icon, color: color[700], size: 20),
-        ),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Jam $label',
-                style: const TextStyle(
-                    color: Colors.grey,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600)),
-            Text(waktu,
-                style: const TextStyle(
-                    color: Colors.black87,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold)),
-          ],
-        )
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10))
-            ]),
+    bool diDalamArea = jarakMeter != null && jarakMeter! <= 50.0;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Status Hari Ini',
-                          style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      isMemuat
-                          ? _buildShimmer(width: 100, height: 24)
-                          : Text(statusHadir,
-                              style: TextStyle(
-                                  color: statusHadirColor,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold),
-                              maxLines: 2),
-                    ],
-                  ),
+                const Text(
+                  'Status Hari Ini',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black54),
                 ),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text('Waktu Server',
-                        style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    isMemuat || waktuServer == null
-                        ? _buildShimmer(width: 60, height: 24)
-                        : Text(
-                            "${waktuServer!.hour.toString().padLeft(2, '0')}:${waktuServer!.minute.toString().padLeft(2, '0')}",
-                            style: const TextStyle(
-                                color: Colors.black87,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold)),
-                  ],
-                ),
+                isMemuat
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : Flexible(
+                        child: Container(
+                          margin: const EdgeInsets.only(left: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusHadirColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: statusHadirColor.withOpacity(0.5)),
+                          ),
+                          child: Text(
+                            statusHadir,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: statusHadirColor),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
               ],
             ),
             const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Divider(height: 1, thickness: 1, color: Colors.black12)),
+              padding: EdgeInsets.symmetric(vertical: 16.0),
+              child: Divider(height: 1, color: Color(0xFFEEEEEE)),
+            ),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildInfoJam(
-                    Icons.login_rounded,
-                    'Masuk',
-                    isMemuat ? '--:--' : _formatJamMenit(jamMasukServer),
-                    Colors.blue),
-                Container(width: 1, height: 40, color: Colors.black12),
-                _buildInfoJam(
-                    Icons.logout_rounded,
-                    'Pulang',
-                    isMemuat ? '--:--' : _formatJamMenit(jamPulangServer),
-                    Colors.orange),
+                Expanded(
+                  child: _buildTimeInfo(
+                    icon: Icons.login_rounded,
+                    title: 'Jam Masuk',
+                    time: jamMasukServer.substring(0, 5),
+                    color: Colors.blue[600]!,
+                  ),
+                ),
+                Container(width: 1, height: 40, color: Colors.grey[200]),
+                Expanded(
+                  child: _buildTimeInfo(
+                    icon: Icons.logout_rounded,
+                    title: 'Jam Pulang',
+                    time: jamPulangServer.substring(0, 5),
+                    color: Colors.orange[600]!,
+                  ),
+                ),
               ],
             ),
-
-            // === INDIKATOR JARAK LOKASI (MINIMALIS) ===
-            const SizedBox(height: 16),
-            isMemuatLokasi
-                ? _buildShimmer(width: 120, height: 12)
-                : Text(
-                    jarakMeter != null
-                        ? 'Jarak perangkat dari sekolah: ${jarakMeter!.toStringAsFixed(1)} meter'
-                        : 'Gagal mendeteksi lokasi Anda',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontStyle: FontStyle.italic,
-                      color: jarakMeter == null ? Colors.red : Colors.grey[500],
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isMemuatLokasi
+                          ? Colors.grey[200]
+                          : (diDalamArea ? Colors.green[100] : Colors.red[100]),
+                      shape: BoxShape.circle,
                     ),
-                    textAlign: TextAlign.center,
+                    child: Icon(
+                      Icons.radar_rounded,
+                      size: 20,
+                      color: isMemuatLokasi
+                          ? Colors.grey[500]
+                          : (diDalamArea ? Colors.green[700] : Colors.red[700]),
+                    ),
                   ),
-            // ===========================================
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Deteksi Lokasi Anda',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87)),
+                        const SizedBox(height: 2),
+                        isMemuatLokasi
+                            ? const Text('Mencari sinyal satelit...',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.black54))
+                            : Text(
+                                jarakMeter != null
+                                    ? '${jarakMeter!.toStringAsFixed(1)} m dari sekolah'
+                                    : 'Akses GPS ditolak',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: diDalamArea
+                                        ? Colors.green[700]
+                                        : Colors.red[700],
+                                    fontWeight: FontWeight.w600),
+                              ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTimeInfo(
+      {required IconData icon,
+      required String title,
+      required String time,
+      required Color color}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+              color: color.withOpacity(0.1), shape: BoxShape.circle),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.black54,
+                      fontWeight: FontWeight.w500)),
+              Text(time,
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black87),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        )
+      ],
     );
   }
 }

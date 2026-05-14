@@ -33,15 +33,18 @@ class _CameraScreenState extends State<CameraScreen> {
   bool _isCameraInitialized = false;
   bool _isLoading = true;
   Position? _posisi;
-
-  // PERBAIKAN: Variabel untuk mengunci status Fake GPS sejak awal pemindaian
   bool _isFakeGpsDetected = false;
-
   String _statusLoading = "Mencari Satelit GPS...";
+
+  // Detektor Mode Dispensasi & Jenis Absen
+  late bool isDispensasi;
+  late bool isMasuk;
 
   @override
   void initState() {
     super.initState();
+    isDispensasi = widget.tipeAbsen.contains('dispensasi');
+    isMasuk = widget.tipeAbsen.contains('masuk');
     _initCameraAndLocation();
   }
 
@@ -51,14 +54,13 @@ class _CameraScreenState extends State<CameraScreen> {
         setState(() => _statusLoading = "Memindai Titik Koordinat Anda...");
       }
 
-      // PERBAIKAN: Gunakan fungsi withMockStatus agar flag Fake GPS langsung tertangkap
       Map<String, dynamic> locationData =
           await LocationHelper.getCurrentLocationWithMockStatus();
       _posisi = locationData['position'] as Position;
       _isFakeGpsDetected = locationData['is_mocked'] as bool;
 
       if (mounted) {
-        setState(() => _statusLoading = "Menghitung Jarak ke Sekolah...");
+        setState(() => _statusLoading = "Menghitung Jarak Jangkauan...");
       }
 
       await Future.delayed(const Duration(milliseconds: 1500));
@@ -70,61 +72,13 @@ class _CameraScreenState extends State<CameraScreen> {
         widget.lonSekolah,
       );
 
-      if (jarak > widget.radius) {
+      // =========================================================
+      // BYPASS GEOFENCING: Jika Dispensasi, abaikan validasi jarak
+      // =========================================================
+      if (jarak > widget.radius && !isDispensasi) {
         if (!mounted) return;
-
         setState(() => _isLoading = false);
-
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
-                      shape: BoxShape.circle),
-                  child: const Icon(Icons.location_off_rounded,
-                      color: Colors.red, size: 40),
-                ),
-                const SizedBox(height: 16),
-                const Text('Di Luar Jangkauan',
-                    style:
-                        TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-              ],
-            ),
-            content: Text(
-              "Tidak dapat melakukan absensi. Jarak Anda saat ini ${jarak.round()} meter dari batas sekolah (Maksimal: ${widget.radius.round()}m).",
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 15, height: 1.5),
-            ),
-            actionsAlignment: MainAxisAlignment.center,
-            actions: [
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red[600],
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12))),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Mengerti',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                ),
-              )
-            ],
-          ),
-        );
+        _tampilkanPesanLuarArea(jarak);
         return;
       }
 
@@ -156,6 +110,56 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
+  void _tampilkanPesanLuarArea(double jarak) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1), shape: BoxShape.circle),
+              child: const Icon(Icons.location_off_rounded,
+                  color: Colors.red, size: 40),
+            ),
+            const SizedBox(height: 16),
+            const Text('Di Luar Jangkauan',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+          ],
+        ),
+        content: Text(
+          "Tidak dapat melakukan absensi. Jarak Anda saat ini ${jarak.round()} meter dari sekolah (Maks: ${widget.radius.round()}m).",
+          textAlign: TextAlign.center,
+          style:
+              const TextStyle(fontSize: 14, height: 1.5, color: Colors.black87),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[600],
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16))),
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pop(context);
+              },
+              child: const Text('Kembali',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _controller?.dispose();
@@ -172,7 +176,6 @@ class _CameraScreenState extends State<CameraScreen> {
     try {
       final XFile file = await _controller!.takePicture();
       if (!mounted) return;
-
       _tampilkanPreviewAbsen(
           File(file.path), _posisi!.latitude, _posisi!.longitude);
     } catch (e) {
@@ -181,85 +184,141 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   void _tampilkanPreviewAbsen(File foto, double lat, double lon) {
+    Color temaWarna = isMasuk
+        ? (isDispensasi ? Colors.teal : Colors.blue[600]!)
+        : Colors.orange[600]!;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       isDismissible: false,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      backgroundColor: Colors.transparent,
       builder: (BuildContext sheetContext) {
-        return Padding(
-          padding: const EdgeInsets.all(24.0),
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Container(
+                  width: 40,
+                  height: 5,
+                  decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(10))),
+              const SizedBox(height: 24),
               Text(
-                widget.tipeAbsen == 'masuk'
-                    ? 'Konfirmasi Absen Masuk'
-                    : 'Konfirmasi Absen Pulang',
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                isDispensasi
+                    ? (isMasuk
+                        ? 'Verifikasi Bukti Kehadiran'
+                        : 'Verifikasi Selesai Tugas')
+                    : (isMasuk
+                        ? 'Verifikasi Absen Masuk'
+                        : 'Verifikasi Absen Pulang'),
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87),
               ),
-              const SizedBox(height: 20),
-              AspectRatio(
-                aspectRatio: 1.0,
+              const SizedBox(height: 24),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.grey[200]!, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5))
+                  ],
+                ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Transform(
-                    alignment: Alignment.center,
-                    transform: Matrix4.rotationY(math.pi),
-                    child: Image.file(foto,
-                        width: double.infinity, fit: BoxFit.cover),
+                  borderRadius: BorderRadius.circular(18),
+                  child: AspectRatio(
+                    aspectRatio: 1.0,
+                    child: Transform(
+                      alignment: Alignment.center,
+                      transform: Matrix4.rotationY(math.pi),
+                      child: Image.file(foto,
+                          width: double.infinity, fit: BoxFit.cover),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(12)),
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey[200]!)),
                 child: Row(
                   children: [
-                    Icon(Icons.location_on, color: Colors.blue[600]),
-                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                          color: temaWarna.withOpacity(0.1),
+                          shape: BoxShape.circle),
+                      child: Icon(
+                          isDispensasi
+                              ? Icons.pin_drop_rounded
+                              : Icons.my_location_rounded,
+                          color: temaWarna),
+                    ),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Koordinat Anda:',
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                          Text('Lat: $lat\nLon: $lon',
+                          Text(
+                              isDispensasi
+                                  ? 'Lokasi Kegiatan Luar'
+                                  : 'Data Lokasi (Terverifikasi)',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: Colors.black87)),
+                          const SizedBox(height: 4),
+                          Text('Lat: $lat',
                               style: TextStyle(
-                                  fontSize: 12, color: Colors.grey[700])),
+                                  fontSize: 12, color: Colors.grey[600])),
+                          Text('Lon: $lon',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[600])),
                         ],
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(sheetContext),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: BorderSide(color: Colors.grey[300]!, width: 1.5),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(16)),
                       ),
-                      child: const Text('Foto Ulang'),
+                      child: Text('Foto Ulang',
+                          style: TextStyle(
+                              color: Colors.grey[700],
+                              fontWeight: FontWeight.bold)),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () async {
                         final absenProvider = Provider.of<AbsensiProvider>(
                             context,
                             listen: false);
-
                         final scaffoldMessenger = ScaffoldMessenger.of(context);
                         final navigatorRoot =
                             Navigator.of(context, rootNavigator: true);
@@ -274,17 +333,20 @@ class _CameraScreenState extends State<CameraScreen> {
                           builder: (BuildContext dialogContext) => Center(
                             child: Card(
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20)),
-                              child: const Padding(
-                                padding: EdgeInsets.all(32.0),
+                                  borderRadius: BorderRadius.circular(24)),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 40, vertical: 32),
                                 child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      CircularProgressIndicator(),
-                                      SizedBox(height: 24),
-                                      Text('Mengirim Data...',
+                                      CircularProgressIndicator(
+                                          color: temaWarna),
+                                      const SizedBox(height: 24),
+                                      const Text('Mengirim Data...',
                                           style: TextStyle(
-                                              fontWeight: FontWeight.bold))
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16))
                                     ]),
                               ),
                             ),
@@ -292,33 +354,33 @@ class _CameraScreenState extends State<CameraScreen> {
                         );
 
                         try {
-                          // PERBAIKAN: Menggunakan flag yang dikunci saat inisialisasi
                           final sukses = await absenProvider.kirimAbsen(
                             foto: foto,
                             lat: lat,
                             lon: lon,
                             isMocked: _isFakeGpsDetected,
-                            tipeAbsen: widget.tipeAbsen,
+                            tipeAbsen: isMasuk ? 'masuk' : 'pulang',
                           );
 
                           navigatorRoot.pop();
-
                           if (sukses && mounted) {
                             navigatorLokal.pop();
-
                             scaffoldMessenger.showSnackBar(
                               SnackBar(
-                                  content: Text(
-                                      'Absen ${widget.tipeAbsen} berhasil tersimpan!'),
-                                  backgroundColor: Colors.green),
+                                // PERBAIKAN: Penambahan const di sini untuk mengatasi linter
+                                content:
+                                    const Text('Absen berhasil tersimpan!'),
+                                backgroundColor: Colors.green,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                              ),
                             );
                           }
                         } catch (e) {
                           navigatorRoot.pop();
-
                           if (mounted) {
                             String pesanError = e.toString();
-
                             if (pesanError.toLowerCase().contains('fake gps') ||
                                 pesanError.toLowerCase().contains('diblokir')) {
                               showDialog(
@@ -339,13 +401,11 @@ class _CameraScreenState extends State<CameraScreen> {
                                               fontSize: 16)),
                                     ],
                                   ),
-                                  content: Text(
-                                    pesanError,
-                                    style: const TextStyle(
-                                        fontSize: 14,
-                                        height: 1.5,
-                                        fontWeight: FontWeight.w500),
-                                  ),
+                                  content: Text(pesanError,
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          height: 1.5,
+                                          fontWeight: FontWeight.w500)),
                                   actions: [
                                     ElevatedButton(
                                       style: ElevatedButton.styleFrom(
@@ -362,43 +422,38 @@ class _CameraScreenState extends State<CameraScreen> {
                               );
                               return;
                             }
-
                             scaffoldMessenger.showSnackBar(SnackBar(
                                 content: Text(pesanError),
                                 backgroundColor: Colors.red));
-
                             if (pesanError.toLowerCase().contains('token') ||
                                 pesanError.toLowerCase().contains('sesi')) {
                               await SecureStorageHelper.clearAll();
-
-                              if (mounted) {
+                              if (context.mounted) {
                                 navigatorLokal.pushAndRemoveUntil(
-                                  MaterialPageRoute(
-                                      builder: (context) =>
-                                          const LoginScreen()),
-                                  (route) => false,
-                                );
+                                    MaterialPageRoute(
+                                        builder: (context) =>
+                                            const LoginScreen()),
+                                    (route) => false);
                               }
                             }
                           }
                         }
                       },
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        backgroundColor: widget.tipeAbsen == 'masuk'
-                            ? Colors.blue[600]
-                            : Colors.orange[600],
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: temaWarna,
                         foregroundColor: Colors.white,
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(16)),
                       ),
-                      child: Text(
-                          'Kirim Absen ${widget.tipeAbsen == 'masuk' ? 'Masuk' : 'Pulang'}'),
+                      child: const Text('Kirim Absen',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16)),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
             ],
           ),
         );
@@ -406,16 +461,57 @@ class _CameraScreenState extends State<CameraScreen> {
     );
   }
 
+  Widget _buildScannerCorner(
+      {double? top,
+      double? bottom,
+      double? left,
+      double? right,
+      required Color frameColor}) {
+    return Positioned(
+      top: top,
+      bottom: bottom,
+      left: left,
+      right: right,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          border: Border(
+            top: top != null
+                ? BorderSide(color: frameColor, width: 4)
+                : BorderSide.none,
+            bottom: bottom != null
+                ? BorderSide(color: frameColor, width: 4)
+                : BorderSide.none,
+            left: left != null
+                ? BorderSide(color: frameColor, width: 4)
+                : BorderSide.none,
+            right: right != null
+                ? BorderSide(color: frameColor, width: 4)
+                : BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    Color temaWarna =
+        isMasuk ? (isDispensasi ? Colors.teal : Colors.blue) : Colors.orange;
+    String labelTop = isDispensasi
+        ? (isMasuk ? 'Bukti Tiba di Lokasi' : 'Selesai Kegiatan')
+        : (isMasuk ? 'Pindai Wajah (Masuk)' : 'Pindai Wajah (Pulang)');
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF111111),
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
-        title: Text(widget.tipeAbsen == 'masuk'
-            ? 'Foto Absen Masuk'
-            : 'Foto Absen Pulang'),
+        centerTitle: true,
+        title: Text(labelTop,
+            style: const TextStyle(
+                fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
         elevation: 0,
       ),
       body: _isLoading
@@ -424,53 +520,83 @@ class _CameraScreenState extends State<CameraScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: 200,
-                    height: 200,
+                    width: 180,
+                    height: 180,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
-                      shape: BoxShape.circle,
-                    ),
+                        color: Colors.white.withOpacity(0.05),
+                        shape: BoxShape.circle),
                     child: Lottie.asset(
                       'assets/animations/location_scan.json',
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                            child:
-                                CircularProgressIndicator(color: Colors.blue));
-                      },
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Center(
+                              child: CircularProgressIndicator(
+                                  color: Colors.white)),
                     ),
                   ),
                   const SizedBox(height: 32),
-                  Text(
-                    _statusLoading,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.5,
-                    ),
-                  )
+                  Text(_statusLoading,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5))
                 ],
               ),
             )
           : Column(
               children: [
-                Expanded(
-                  child: Center(
-                    child: AspectRatio(
-                      aspectRatio: 1.0,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                const SizedBox(height: 20),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDispensasi
+                        ? Colors.teal.withOpacity(0.2)
+                        : Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: isDispensasi
+                            ? Colors.teal.withOpacity(0.5)
+                            : Colors.white.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                          isDispensasi
+                              ? Icons.rocket_launch_rounded
+                              : Icons.gps_fixed_rounded,
+                          color: isDispensasi
+                              ? Colors.tealAccent
+                              : Colors.greenAccent,
+                          size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                          isDispensasi
+                              ? 'Akses Jarak Jauh Diizinkan'
+                              : 'Lokasi Sesuai Zona Sekolah',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+
+                AspectRatio(
+                  aspectRatio: 1.0,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                                color: widget.tipeAbsen == 'masuk'
-                                    ? Colors.blue
-                                    : Colors.orange,
-                                width: 3)),
+                            borderRadius: BorderRadius.circular(32)),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(21),
+                          borderRadius: BorderRadius.circular(32),
                           child: _isCameraInitialized && _controller != null
                               ? SizedBox(
                                   width: double.infinity,
@@ -485,30 +611,55 @@ class _CameraScreenState extends State<CameraScreen> {
                                   ),
                                 )
                               : const Center(
-                                  child: Text('Kamera tidak tersedia',
-                                      style: TextStyle(color: Colors.white))),
+                                  child: Text('Memuat Lensa...',
+                                      style: TextStyle(color: Colors.white54))),
                         ),
                       ),
-                    ),
+                      _buildScannerCorner(
+                          top: 10, left: 10, frameColor: temaWarna),
+                      _buildScannerCorner(
+                          top: 10, right: 10, frameColor: temaWarna),
+                      _buildScannerCorner(
+                          bottom: 10, left: 10, frameColor: temaWarna),
+                      _buildScannerCorner(
+                          bottom: 10, right: 10, frameColor: temaWarna),
+                    ],
                   ),
                 ),
+                const Spacer(),
+
+                // PERBAIKAN: Penambahan const di sini untuk mengatasi linter
+                const Text('Posisikan wajah Anda di tengah layar',
+                    style: TextStyle(color: Colors.white54, fontSize: 13)),
+                const SizedBox(height: 24),
+
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 40, top: 20),
+                  padding: const EdgeInsets.only(bottom: 60),
                   child: GestureDetector(
                     onTap: _ambilFoto,
                     child: Container(
-                      height: 80,
-                      width: 80,
+                      height: 84,
+                      width: 84,
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color: Colors.white.withOpacity(0.5), width: 3),
+                      ),
+                      child: Container(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 4),
-                          color: (widget.tipeAbsen == 'masuk'
-                                  ? Colors.blue
-                                  : Colors.orange)
-                              .withOpacity(0.8)),
-                      child: const Center(
-                          child: Icon(Icons.camera_alt,
-                              color: Colors.white, size: 36)),
+                          color: temaWarna,
+                          boxShadow: [
+                            BoxShadow(
+                                color: temaWarna.withOpacity(0.5),
+                                blurRadius: 20,
+                                spreadRadius: 5)
+                          ],
+                        ),
+                        child: const Icon(Icons.camera_rounded,
+                            color: Colors.white, size: 36),
+                      ),
                     ),
                   ),
                 )

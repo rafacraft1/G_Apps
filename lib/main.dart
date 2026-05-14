@@ -4,12 +4,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // <-- 1. IMPORT DOTENV
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // Import Provider
 import 'providers/auth_provider.dart';
 import 'providers/pengumuman_provider.dart';
 import 'providers/absensi_provider.dart';
+import 'providers/izin_provider.dart';
 
 // Import Helper & Screen
 import 'core/utils/secure_storage_helper.dart';
@@ -21,26 +22,24 @@ import 'screens/splash/splash_screen.dart';
 Future<void> _prosesSinyalTracking(RemoteMessage message, String tipe) async {
   debugPrint("Sinyal Ping $tipe Diterima: ${message.data}");
 
-  // Jika Web CI4 mengirim aksi 'TRACKING_REQUEST'[cite: 7]
-  if (message.data['action'] == 'TRACKING_REQUEST') {
+  // PERBAIKAN 1: Sesuaikan dengan payload dari Web Admin CI4
+  if (message.data['action'] == 'fetch_location') {
     try {
-      // 1. Cek Token Siswa (Agar tahu siapa yg dilacak)[cite: 7]
+      // 1. Cek Token Siswa (Agar tahu siapa yg dilacak)
       String? token = await SecureStorageHelper.getToken();
       if (token == null) return;
 
-      // 2. Tembak Lokasi Asli[cite: 7]
+      // 2. Tembak Lokasi Asli secara diam-diam
       Position posisi = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      // --- PERBAIKAN: Ambil URL dari .env ---
-      // Gunakan nilai default lokal jika gagal membaca .env untuk mencegah crash
       String baseUrl =
           dotenv.env['BASE_URL'] ?? 'http://192.168.0.105:8080/api/v1';
 
-      // 3. Kirim ke Backend CI4[cite: 7]
+      // 3. Kirim ke Backend CI4
       Dio dio = Dio(BaseOptions(
-        baseUrl: baseUrl, // <-- 2. GUNAKAN VARIABEL DARI .ENV
+        baseUrl: baseUrl,
         connectTimeout: const Duration(seconds: 15),
       ));
 
@@ -49,13 +48,19 @@ Future<void> _prosesSinyalTracking(RemoteMessage message, String tipe) async {
         'long': posisi.longitude,
       });
 
+      // PERBAIKAN 2: Sesuaikan endpoint dengan TrackingApi.php
       await dio.post(
-        '/tracking/update',
+        '/tracking/updateLokasi',
         data: formData,
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
       );
 
-      debugPrint("BERHASIL: Lokasi dikirim dari $tipe ke Server/Firebase!");
+      debugPrint("BERHASIL: Lokasi dikirim dari $tipe ke Server!");
     } catch (e) {
       debugPrint("GAGAL: Mengirim lokasi $tipe. Error: $e");
     }
@@ -67,33 +72,32 @@ Future<void> _prosesSinyalTracking(RemoteMessage message, String tipe) async {
 // =====================================================================
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Pastikan Firebase aktif walau UI tidak jalan[cite: 7]
+  // Pastikan Firebase aktif walau UI tidak jalan
   await Firebase.initializeApp();
 
-  // --- 3. LOAD DOTENV DI BACKGROUND ---
-  // Sangat penting karena saat aplikasi mati, fungsi main() tidak dijalankan
+  // Load DOTENV di background agar Base URL terbaca
   await dotenv.load(fileName: ".env");
 
-  // Lemparkan ke fungsi inti[cite: 7]
+  // Lemparkan ke fungsi inti
   await _prosesSinyalTracking(message, "Latar Belakang (Background)");
 }
 
 void main() async {
-  // Pastikan core Flutter sudah jalan sebelum panggil Firebase[cite: 7]
+  // Pastikan core Flutter sudah jalan sebelum panggil Firebase
   WidgetsFlutterBinding.ensureInitialized();
 
-  // --- 4. LOAD DOTENV DI FOREGROUND ---
+  // Load DOTENV di foreground
   await dotenv.load(fileName: ".env");
 
-  // Inisialisasi Firebase[cite: 7]
+  // Inisialisasi Firebase
   await Firebase.initializeApp();
 
-  // 1. Daftarkan PINTU BELAKANG (Aplikasi Ditutup / Background)[cite: 7]
+  // 1. Daftarkan PINTU BELAKANG (Aplikasi Ditutup / Berjalan di Background)
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // 2. Daftarkan PINTU DEPAN (Aplikasi Sedang Dibuka / Foreground)[cite: 7]
+  // 2. Daftarkan PINTU DEPAN (Aplikasi Sedang Dibuka / Foreground)
   FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-    // Lemparkan ke fungsi inti[cite: 7]
+    // Lemparkan ke fungsi inti
     await _prosesSinyalTracking(message, "Layar Aktif (Foreground)");
   });
 
@@ -110,6 +114,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => PengumumanProvider()),
         ChangeNotifierProvider(create: (_) => AbsensiProvider()),
+        ChangeNotifierProvider(create: (_) => IzinProvider()),
       ],
       child: MaterialApp(
         title: 'Sistem Absensi Geofence',
@@ -117,6 +122,7 @@ class MyApp extends StatelessWidget {
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
           useMaterial3: true,
+          fontFamily: 'GoogleSans',
         ),
         home: const SplashScreen(),
       ),

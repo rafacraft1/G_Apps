@@ -9,8 +9,6 @@ class HomeHeader extends StatelessWidget {
   final DateTime? waktuServer;
   final VoidCallback onRiwayatTap;
   final VoidCallback onLogoutTap;
-
-  // PERBAIKAN: Tambahkan parameter callback untuk trigger refresh dari HomeScreen
   final VoidCallback onRefreshProfile;
 
   const HomeHeader({
@@ -20,10 +18,19 @@ class HomeHeader extends StatelessWidget {
     required this.waktuServer,
     required this.onRiwayatTap,
     required this.onLogoutTap,
-    required this.onRefreshProfile, // Wajibkan parameter ini
+    required this.onRefreshProfile,
   });
 
-  String _formatTanggalSingkat(DateTime dt) {
+  String _formatWaktuLengkap(DateTime dt) {
+    List<String> hari = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu'
+    ];
     List<String> bulan = [
       'Jan',
       'Feb',
@@ -38,138 +45,161 @@ class HomeHeader extends StatelessWidget {
       'Nov',
       'Des'
     ];
-    return "${dt.day} ${bulan[dt.month - 1]} ${dt.year}";
+
+    String namaHari = hari[dt.weekday - 1];
+    String jam = dt.hour.toString().padLeft(2, '0');
+    String menit = dt.minute.toString().padLeft(2, '0');
+    String detik = dt.second.toString().padLeft(2, '0');
+
+    return "$namaHari, ${dt.day} ${bulan[dt.month - 1]} ${dt.year} • $jam:$menit:$detik";
   }
 
-  String _getValidFotoUrl(String? originalUrl) {
-    if (originalUrl == null || originalUrl.isEmpty) return '';
+  String _getValidFotoUrl(String? fileName) {
+    if (fileName == null || fileName.isEmpty) return '';
+    if (fileName.startsWith('http')) return fileName;
     try {
       String baseUrlEnv = dotenv.env['BASE_URL'] ?? '';
-      if (baseUrlEnv.isEmpty) return originalUrl;
-
+      if (baseUrlEnv.isEmpty) return fileName;
       Uri apiUri = Uri.parse(baseUrlEnv);
       String validHost =
           '${apiUri.scheme}://${apiUri.host}${apiUri.hasPort ? ':${apiUri.port}' : ''}';
-      Uri fotoUri = Uri.parse(originalUrl);
-
-      return '$validHost${fotoUri.path}';
+      return '$validHost/uploads/siswa/$fileName';
     } catch (e) {
-      return originalUrl;
+      return fileName;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    waktuServer != null
-                        ? _formatTanggalSingkat(waktuServer!)
-                        : 'Memuat...',
-                    style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text('Geofence App',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5)),
-                ],
-              ),
-              Row(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12)),
-                    child: IconButton(
-                        icon: const Icon(Icons.history_rounded,
-                            color: Colors.white, size: 20),
-                        onPressed: onRiwayatTap,
-                        tooltip: 'Riwayat Absensi'),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12)),
-                    child: IconButton(
-                        icon: const Icon(Icons.logout_rounded,
-                            color: Colors.white, size: 20),
-                        onPressed: onLogoutTap,
-                        tooltip: 'Keluar'),
-                  ),
-                ],
-              )
-            ],
-          ),
+    return Container(
+      padding: const EdgeInsets.only(top: 10, bottom: 130),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.blue[900]!, Colors.blue[600]!],
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-          child: Row(
-            children: [
-              GestureDetector(
-                onTap: () async {
-                  // PERBAIKAN: Pindah halaman, lalu jalankan fungsi refresh setelah kembali
-                  await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const ProfileScreen()));
-
-                  // Panggil fungsi setState dari HomeScreen untuk memperbarui foto UI
-                  onRefreshProfile();
-                },
-                child: CircleAvatar(
-                  radius: 25,
-                  backgroundColor: Colors.white,
-                  backgroundImage: fotoUrl != null && fotoUrl!.isNotEmpty
-                      ? CachedNetworkImageProvider(_getValidFotoUrl(fotoUrl))
-                      : null,
-                  child: fotoUrl == null || fotoUrl!.isEmpty
-                      ? Text(
-                          namaSiswa.isNotEmpty
-                              ? namaSiswa.substring(0, 1).toUpperCase()
-                              : 'S',
-                          style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue[800]))
-                      : null,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Selamat Datang,',
-                        style: TextStyle(color: Colors.white70, fontSize: 14)),
-                    Text(namaSiswa,
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        waktuServer != null
+                            ? _formatWaktuLengkap(waktuServer!)
+                            : 'Menghubungkan...',
                         style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600),
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                  ],
-                ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildActionBtn(
+                      Icons.history_rounded, onRiwayatTap, 'Riwayat'),
+                  const SizedBox(width: 8),
+                  _buildActionBtn(Icons.logout_rounded, onLogoutTap, 'Keluar'),
+                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () async {
+                      await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const ProfileScreen()));
+                      onRefreshProfile();
+                    },
+                    child: Hero(
+                      tag: 'profil_avatar',
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: Colors.white.withOpacity(0.5), width: 3),
+                        ),
+                        child: CircleAvatar(
+                          radius: 28,
+                          backgroundColor: Colors.white,
+                          backgroundImage:
+                              fotoUrl != null && fotoUrl!.isNotEmpty
+                                  ? CachedNetworkImageProvider(
+                                      _getValidFotoUrl(fotoUrl))
+                                  : null,
+                          child: fotoUrl == null || fotoUrl!.isEmpty
+                              ? Text(
+                                  namaSiswa.isNotEmpty
+                                      ? namaSiswa.substring(0, 1).toUpperCase()
+                                      : 'S',
+                                  style: TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue[800]),
+                                )
+                              : null,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Selamat Datang,',
+                            style: TextStyle(
+                                color: Colors.blue[100], fontSize: 14)),
+                        Text(
+                          namaSiswa,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildActionBtn(IconData icon, VoidCallback onTap, String tooltip) {
+    return Container(
+      decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15), shape: BoxShape.circle),
+      child: IconButton(
+        icon: Icon(icon, color: Colors.white, size: 20),
+        onPressed: onTap,
+        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        padding: EdgeInsets.zero,
+      ),
     );
   }
 }

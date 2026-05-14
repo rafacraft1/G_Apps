@@ -11,6 +11,8 @@ import '../../providers/absensi_provider.dart';
 import '../auth/login_screen.dart';
 import '../absen/camera_screen.dart';
 import '../absen/riwayat_screen.dart';
+import '../izin/ajukan_izin_screen.dart';
+import '../izin/riwayat_izin_screen.dart';
 
 import 'widgets/home_header.dart';
 import 'widgets/status_card.dart';
@@ -32,7 +34,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isMemuatWaktu = true;
   Map<String, dynamic>? _dataAbsenHariIni;
 
-  // Variabel Hari Libur
   bool _isLibur = false;
   String _namaLibur = '';
 
@@ -51,7 +52,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadProfileData();
     _refreshSemuaData();
 
-    // Jalankan jam realtime setiap detik
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_waktuServer != null && mounted) {
         setState(() {
@@ -70,11 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadProfileData() async {
     String? nama = await SecureStorageHelper.getUserName();
     String? foto = await SecureStorageHelper.getFotoProfile();
-
-    if (!mounted) {
-      return;
-    }
-
+    if (!mounted) return;
     setState(() {
       _namaSiswa = nama ?? 'Siswa';
       _fotoUrl = foto;
@@ -82,22 +78,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refreshSemuaData() async {
-    if (!mounted) {
-      return;
-    }
-
+    if (!mounted) return;
     setState(() {
       _isMemuatWaktu = true;
       _isMemuatLokasi = true;
     });
 
-    // 1. Sinkronisasi Waktu & Konfigurasi dari Backend
     final serverData = await ApiClient.getServerData();
-
-    // Guard untuk State.context menggunakan `mounted`
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     if (serverData != null) {
       setState(() {
@@ -112,46 +100,24 @@ class _HomeScreenState extends State<HomeScreen> {
         _isMemuatWaktu = false;
       });
     } else {
-      setState(() {
-        _isMemuatWaktu = false;
-      });
+      setState(() => _isMemuatWaktu = false);
     }
 
-    // 2. Periksa Status Absensi Hari Ini
     if (_waktuServer != null) {
       String tanggalHariIni =
           "${_waktuServer!.year}-${_waktuServer!.month.toString().padLeft(2, '0')}-${_waktuServer!.day.toString().padLeft(2, '0')}";
-
       try {
-        if (!mounted) {
-          return;
-        }
-
         final absenHariIni =
             await Provider.of<AbsensiProvider>(context, listen: false)
                 .cekAbsenHariIni(tanggalHariIni);
-
-        if (!mounted) {
-          return;
-        }
-
-        setState(() {
-          _dataAbsenHariIni = absenHariIni;
-        });
+        if (!mounted) return;
+        setState(() => _dataAbsenHariIni = absenHariIni);
       } catch (e) {
-        if (e.toString() == 'sesi_habis') {
-          _prosesLogoutExpired();
-        }
+        if (e.toString() == 'sesi_habis') _prosesLogoutExpired();
       }
     }
-
-    // 3. Update Lokasi GPS & Tarik Pengumuman
     await _updateLokasiJarak();
-
-    if (!mounted) {
-      return;
-    }
-
+    if (!mounted) return;
     Provider.of<PengumumanProvider>(context, listen: false).fetchPengumuman();
   }
 
@@ -159,27 +125,15 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       Position pos = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
-
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       double jarak = Geolocator.distanceBetween(
-        pos.latitude,
-        pos.longitude,
-        _latSekolah,
-        _lonSekolah,
-      );
-
+          pos.latitude, pos.longitude, _latSekolah, _lonSekolah);
       setState(() {
         _jarakMeter = jarak;
         _isMemuatLokasi = false;
       });
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       setState(() {
         _jarakMeter = null;
         _isMemuatLokasi = false;
@@ -189,54 +143,224 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _prosesLogoutExpired() async {
     await SecureStorageHelper.clearAll();
-
-    if (!mounted) {
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('Sesi Anda telah habis. Silakan login kembali.'),
-          backgroundColor: Colors.red),
-    );
+    if (!mounted) return;
     Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-      (route) => false,
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false);
+  }
+
+  Widget _buildActionMenu({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required MaterialColor color,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration:
+                      BoxDecoration(color: color[50], shape: BoxShape.circle),
+                  child: Icon(icon, color: color[700], size: 24),
+                ),
+                const SizedBox(height: 16),
+                Text(title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Colors.black87)),
+                const SizedBox(height: 4),
+                Text(subtitle,
+                    style:
+                        const TextStyle(fontSize: 11, color: Colors.black54)),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // === LOGIKA TOMBOL ABSENSI ===
-    String labelTombol = 'Memuat Data...';
-    Color warnaTombol = Colors.grey[600]!;
+    String statusHariIni = 'Memuat...';
+    Color warnaStatus = Colors.grey;
+    String labelTombol = 'Memuat...';
+    String subLabel = 'Mohon tunggu...';
+    Color warnaTombol = Colors.grey;
     IconData iconTombol = Icons.hourglass_empty;
     bool isTombolDisable = _isMemuatWaktu || _isMemuatLokasi;
     String tipeAbsen = 'masuk';
 
-    if (!isTombolDisable) {
-      if (_isLibur) {
-        labelTombol =
-            _namaLibur.isNotEmpty ? _namaLibur : 'Libur / Akhir Pekan';
-        warnaTombol = Colors.grey[500]!;
-        iconTombol = Icons.event_busy_rounded;
-        isTombolDisable = true;
-      } else if (_dataAbsenHariIni == null) {
-        labelTombol = 'Absen Masuk';
-        warnaTombol = Colors.blue[600]!;
-        iconTombol = Icons.login_rounded;
-        tipeAbsen = 'masuk';
-      } else if (_dataAbsenHariIni!['jam_pulang'] == null) {
-        labelTombol = 'Absen Pulang';
-        warnaTombol = Colors.orange[600]!;
-        iconTombol = Icons.logout_rounded;
-        tipeAbsen = 'pulang';
-      } else {
-        labelTombol = 'Sudah Absen Hari Ini';
-        warnaTombol = Colors.green[600]!;
-        iconTombol = Icons.check_circle_outline;
-        isTombolDisable = true;
+    if (!isTombolDisable && _waktuServer != null) {
+      try {
+        List<String> jm = _jamMasukServer.split(':');
+        List<String> jp = _jamPulangServer.split(':');
+        DateTime jamMasuk = DateTime(
+            _waktuServer!.year,
+            _waktuServer!.month,
+            _waktuServer!.day,
+            int.parse(jm[0]),
+            int.parse(jm[1]),
+            int.parse(jm[2]));
+        DateTime jamPulang = DateTime(
+            _waktuServer!.year,
+            _waktuServer!.month,
+            _waktuServer!.day,
+            int.parse(jp[0]),
+            int.parse(jp[1]),
+            int.parse(jp[2]));
+        DateTime batasAwalMasuk =
+            jamMasuk.subtract(const Duration(minutes: 30));
+        DateTime batasAkhirMasuk =
+            jamPulang.subtract(const Duration(minutes: 30));
+        DateTime batasAkhirPulang = DateTime(_waktuServer!.year,
+            _waktuServer!.month, _waktuServer!.day, 23, 0, 0);
+
+        if (_isLibur) {
+          statusHariIni = 'Libur';
+          warnaStatus = Colors.grey;
+          labelTombol = 'Sekolah Libur';
+          subLabel = _namaLibur.isNotEmpty ? _namaLibur : 'Libur Akhir Pekan';
+          warnaTombol = Colors.grey;
+          iconTombol = Icons.event_busy;
+          isTombolDisable = true;
+        } else if (_dataAbsenHariIni == null) {
+          tipeAbsen = 'masuk';
+          if (_waktuServer!.isAfter(batasAkhirMasuk)) {
+            statusHariIni = 'Alpa';
+            warnaStatus = Colors.red;
+            labelTombol = 'Waktu Habis';
+            subLabel = 'Anda tidak absen masuk';
+            warnaTombol = Colors.red;
+            iconTombol = Icons.close;
+            isTombolDisable = true;
+          } else {
+            statusHariIni = 'Belum Absen';
+            warnaStatus = Colors.orange;
+            if (_waktuServer!.isBefore(batasAwalMasuk)) {
+              labelTombol = 'Belum Waktunya';
+              subLabel =
+                  'Dibuka pukul ${batasAwalMasuk.hour.toString().padLeft(2, '0')}:${batasAwalMasuk.minute.toString().padLeft(2, '0')}';
+              warnaTombol = Colors.grey;
+              iconTombol = Icons.lock;
+              isTombolDisable = true;
+            } else {
+              labelTombol = 'Absen Masuk';
+              subLabel = 'Ketuk untuk mulai';
+              warnaTombol = Colors.blue;
+              iconTombol = Icons.login;
+            }
+          }
+        } else {
+          // ====================================================================
+          // LOGIKA CERDAS: Deteksi Status Sakit/Izin/Dispensasi dari Database
+          // ====================================================================
+          String statusAbsenServer = _dataAbsenHariIni!['status'] ?? '';
+
+          if (statusAbsenServer == 'Sakit' || statusAbsenServer == 'Izin') {
+            statusHariIni = statusAbsenServer;
+            warnaStatus =
+                statusAbsenServer == 'Sakit' ? Colors.purple : Colors.indigo;
+            labelTombol = 'Anda Sedang $statusAbsenServer';
+            subLabel = statusAbsenServer == 'Sakit'
+                ? 'Semoga lekas sembuh!'
+                : 'Semoga urusan Anda lancar!';
+            warnaTombol = warnaStatus;
+            iconTombol = statusAbsenServer == 'Sakit'
+                ? Icons.medical_services_rounded
+                : Icons.info_outline_rounded;
+            isTombolDisable = true; // Kunci tombol
+          }
+          // --- LOGIKA BYPASS DISPENSASI ---
+          else if (statusAbsenServer == 'Dispensasi') {
+            statusHariIni = 'Dispensasi Luar';
+            warnaStatus = Colors.teal;
+
+            if (_dataAbsenHariIni!['jam_masuk'] == null) {
+              tipeAbsen =
+                  'masuk_dispensasi'; // Parameter khusus ke API & Kamera
+              labelTombol = 'Absen Lokasi Kegiatan';
+              subLabel = 'Ketuk untuk kirim bukti tiba';
+              warnaTombol = Colors.teal;
+              iconTombol = Icons.pin_drop_rounded;
+              isTombolDisable = false; // BUKA KUNCI TOMBOL!
+            } else if (_dataAbsenHariIni!['jam_pulang'] == null) {
+              tipeAbsen =
+                  'pulang_dispensasi'; // Parameter khusus ke API & Kamera
+              labelTombol = 'Absen Pulang Kegiatan';
+              subLabel = 'Ketuk jika acara selesai';
+              warnaTombol = Colors.orange;
+              iconTombol = Icons.directions_run_rounded;
+              isTombolDisable = false; // BUKA KUNCI TOMBOL!
+            } else {
+              statusHariIni = 'Hadir (Dispensasi)';
+              labelTombol = 'Tugas Selesai';
+              subLabel = 'Terima kasih atas dedikasinya!';
+              warnaTombol = Colors.green;
+              iconTombol = Icons.verified_rounded;
+              isTombolDisable = true;
+            }
+          }
+          // -----------------------------------
+          // Jika statusnya bukan Sakit/Izin/Dispensasi, lanjutkan ke logika Absen Pulang
+          else if (_dataAbsenHariIni!['jam_pulang'] == null) {
+            tipeAbsen = 'pulang';
+            statusHariIni = 'Belum Absen Pulang';
+            warnaStatus = Colors.blue;
+            if (_waktuServer!.isBefore(jamPulang)) {
+              labelTombol = 'Belum Jam Pulang';
+              subLabel =
+                  'Pulang pukul ${jamPulang.hour.toString().padLeft(2, '0')}:${jamPulang.minute.toString().padLeft(2, '0')}';
+              warnaTombol = Colors.grey;
+              iconTombol = Icons.lock;
+              isTombolDisable = true;
+            } else if (_waktuServer!.isAfter(batasAkhirPulang)) {
+              labelTombol = 'Sesi Berakhir';
+              subLabel = 'Batas absen 23:00';
+              warnaTombol = Colors.red;
+              isTombolDisable = true;
+            } else {
+              labelTombol = 'Absen Pulang';
+              subLabel = 'Ketuk untuk pulang';
+              warnaTombol = Colors.orange;
+              iconTombol = Icons.logout;
+            }
+          } else {
+            statusHariIni = 'Hadir';
+            warnaStatus = Colors.green;
+            labelTombol = 'Selesai';
+            subLabel = 'Terima kasih hari ini!';
+            warnaTombol = Colors.green;
+            iconTombol = Icons.check_circle;
+            isTombolDisable = true;
+          }
+        }
+      } catch (e) {
+        statusHariIni = 'Error';
       }
     }
 
@@ -244,98 +368,108 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.grey[50],
       body: RefreshIndicator(
         onRefresh: _refreshSemuaData,
-        color: Colors.blue,
         child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics()),
           slivers: [
-            // HEADER
             SliverToBoxAdapter(
-              child: HomeHeader(
-                namaSiswa: _namaSiswa,
-                fotoUrl: _fotoUrl,
-                waktuServer: _waktuServer,
-                onRefreshProfile: _loadProfileData,
-                onRiwayatTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const RiwayatScreen()),
-                  );
-                },
-                onLogoutTap: () async {
-                  await SecureStorageHelper.clearAll();
-
-                  // Guard untuk BuildContext parameter (local context) menggunakan context.mounted
-                  if (!context.mounted) {
-                    return;
-                  }
-
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const LoginScreen()),
-                    (route) => false,
-                  );
-                },
-              ),
-            ),
-
-            // CARD STATUS KEHADIRAN
-            SliverToBoxAdapter(
-              child: Transform.translate(
-                offset: const Offset(0, -30),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: StatusCard(
-                    isMemuat: _isMemuatWaktu,
-                    statusHadir: _dataAbsenHariIni?['status'] ?? 'Belum Absen',
-                    statusHadirColor: _dataAbsenHariIni != null
-                        ? (_dataAbsenHariIni!['status'] == 'Hadir'
-                            ? Colors.green
-                            : Colors.orange)
-                        : Colors.grey,
-                    waktuServer: _waktuServer,
-                    jamMasukServer: _jamMasukServer,
-                    jamPulangServer: _jamPulangServer,
-                    jarakMeter: _jarakMeter,
-                    isMemuatLokasi: _isMemuatLokasi,
+              child: Column(
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.topCenter,
+                    children: [
+                      HomeHeader(
+                        namaSiswa: _namaSiswa,
+                        fotoUrl: _fotoUrl,
+                        waktuServer: _waktuServer,
+                        onRefreshProfile: _loadProfileData,
+                        onRiwayatTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const RiwayatScreen())),
+                        onLogoutTap: () async {
+                          await SecureStorageHelper.clearAll();
+                          if (!context.mounted) return;
+                          Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const LoginScreen()),
+                              (r) => false);
+                        },
+                      ),
+                      Positioned(
+                        bottom: -120,
+                        left: 20,
+                        right: 20,
+                        child: StatusCard(
+                          isMemuat: _isMemuatWaktu,
+                          statusHadir: statusHariIni,
+                          statusHadirColor: warnaStatus,
+                          waktuServer: _waktuServer,
+                          jamMasukServer: _jamMasukServer,
+                          jamPulangServer: _jamPulangServer,
+                          jarakMeter: _jarakMeter,
+                          isMemuatLokasi: _isMemuatLokasi,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+                  const SizedBox(height: 140),
+                ],
               ),
             ),
-
-            // LIST PENGUMUMAN
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const Text('Layanan Siswa',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87)),
+                    const SizedBox(height: 12),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Informasi Sekolah',
-                            style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87)),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.push(
+                        Expanded(
+                          child: _buildActionMenu(
+                            context: context,
+                            title: 'Ajukan Izin',
+                            subtitle: 'Sakit/Keperluan',
+                            icon: Icons.edit_document,
+                            color: Colors.orange,
+                            onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (context) =>
-                                        const RiwayatScreen()));
-                          },
-                          child: const Text('Lihat Semua',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 13)),
+                                    builder: (_) => const AjukanIzinScreen())),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildActionMenu(
+                            context: context,
+                            title: 'Status Izin',
+                            subtitle: 'Riwayat Pengajuan',
+                            icon: Icons.assignment_turned_in_rounded,
+                            color: Colors.blue,
+                            onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const RiwayatIzinScreen())),
+                          ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 32),
+                    const Text('Informasi Sekolah',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87)),
                     const SizedBox(height: 12),
                     const PengumumanList(),
-                    const SizedBox(height: 100),
                   ],
                 ),
               ),
@@ -343,57 +477,51 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-
-      // TOMBOL AKSI UTAMA
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        child: Hero(
-          tag: 'btn_absen_hero',
-          child: SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton(
-              onPressed: isTombolDisable
-                  ? null
-                  : () async {
-                      await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => CameraScreen(
-                                    tipeAbsen: tipeAbsen,
-                                    latSekolah: _latSekolah,
-                                    lonSekolah: _lonSekolah,
-                                    radius: _radius,
-                                  )));
-
-                      // Guard untuk BuildContext parameter (local context) menggunakan context.mounted
-                      if (!context.mounted) {
-                        return;
-                      }
-
-                      _refreshSemuaData();
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: warnaTombol,
-                foregroundColor: Colors.white,
-                elevation: isTombolDisable ? 0 : 4,
-                disabledBackgroundColor: warnaTombol.withOpacity(0.5),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
-              ),
-              child: _isMemuatWaktu || _isMemuatLokasi
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(iconTombol, size: 24),
-                        const SizedBox(width: 12),
-                        Text(labelTombol,
-                            style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: SizedBox(
+          width: double.infinity,
+          height: 65,
+          child: ElevatedButton(
+            onPressed: isTombolDisable
+                ? null
+                : () async {
+                    await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => CameraScreen(
+                                  tipeAbsen: tipeAbsen,
+                                  latSekolah: _latSekolah,
+                                  lonSekolah: _lonSekolah,
+                                  radius: _radius,
+                                )));
+                    _refreshSemuaData();
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: warnaTombol,
+              disabledBackgroundColor: warnaTombol.withOpacity(0.8),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(iconTombol, color: Colors.white),
+                const SizedBox(width: 12),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(labelTombol,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, color: Colors.white)),
+                    Text(subLabel,
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.white70)),
+                  ],
+                )
+              ],
             ),
           ),
         ),

@@ -17,8 +17,8 @@ class AbsensiProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // PERBAIKAN: Sesuaikan penamaan endpoint dengan standar CI4
-      final response = await ApiClient().dio.get('/absensi/riwayat');
+      // PERBAIKAN: Ubah /absensi/riwayat menjadi /absen/riwayat agar cocok dengan Routes.php
+      final response = await ApiClient().dio.get('/absen/riwayat');
 
       if (response.statusCode == 200 && response.data != null) {
         _listRiwayat = response.data['data'] ?? [];
@@ -36,7 +36,8 @@ class AbsensiProvider with ChangeNotifier {
 
   Future<Map<String, dynamic>?> cekAbsenHariIni(String tanggal) async {
     try {
-      final response = await ApiClient().dio.get('/absensi/riwayat');
+      // PERBAIKAN: Ubah /absensi/riwayat menjadi /absen/riwayat
+      final response = await ApiClient().dio.get('/absen/riwayat');
 
       if (response.statusCode == 200 && response.data != null) {
         List data = response.data['data'] ?? [];
@@ -49,6 +50,7 @@ class AbsensiProvider with ChangeNotifier {
       return null;
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
+        // Ini yang memicu pesan "Sesi Habis" di HomeScreen jika rute salah/token ditolak
         throw 'sesi_habis';
       }
       return null;
@@ -83,7 +85,6 @@ class AbsensiProvider with ChangeNotifier {
       List<int> imageBytes = await finalFile.readAsBytes();
       String base64Foto = "data:image/jpeg;base64,${base64Encode(imageBytes)}";
 
-      // PERBAIKAN: Penamaan Key wajib persis dengan validator CI4
       FormData formData = FormData.fromMap({
         'latitude': lat.toString(),
         'longitude': lon.toString(),
@@ -91,8 +92,9 @@ class AbsensiProvider with ChangeNotifier {
         'foto': base64Foto,
       });
 
+      // PERBAIKAN: Ubah /absensi/ menjadi /absen/
       final response = await ApiClient().dio.post(
-            '/absensi/$tipeAbsen',
+            '/absen/$tipeAbsen',
             data: formData,
           );
 

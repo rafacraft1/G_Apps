@@ -8,6 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../core/utils/secure_storage_helper.dart';
 
 import '../auth/login_screen.dart';
+import '../izin/riwayat_izin_screen.dart'; // Import layar riwayat izin
 import 'widgets/profile_card.dart';
 import 'widgets/security_menu.dart';
 
@@ -35,9 +36,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final nama = await SecureStorageHelper.getUserName();
     final foto = await SecureStorageHelper.getFotoProfile();
 
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     setState(() {
       _namaSiswa = nama ?? 'Siswa';
@@ -45,59 +44,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  String _getValidFotoUrl(String? originalUrl) {
-    if (originalUrl == null || originalUrl.isEmpty) return '';
+  String _getValidFotoUrl(String? fileName) {
+    if (fileName == null || fileName.isEmpty) return '';
+    if (fileName.startsWith('http')) return fileName;
     try {
       String baseUrlEnv = dotenv.env['BASE_URL'] ?? '';
-      if (baseUrlEnv.isEmpty) return originalUrl;
+      if (baseUrlEnv.isEmpty) return fileName;
 
       Uri apiUri = Uri.parse(baseUrlEnv);
       String validHost =
           '${apiUri.scheme}://${apiUri.host}${apiUri.hasPort ? ':${apiUri.port}' : ''}';
-      Uri fotoUri = Uri.parse(originalUrl);
 
-      return '$validHost${fotoUri.path}';
+      return '$validHost/uploads/siswa/$fileName';
     } catch (e) {
-      return originalUrl;
+      return fileName;
     }
   }
 
   Future<void> _pilihDanUploadFoto() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
     try {
       final XFile? image = await _picker.pickImage(
           source: ImageSource.gallery, imageQuality: 70);
+      if (image == null) return;
 
-      if (image == null) {
-        return;
-      }
+      if (!mounted) return;
+      setState(() => _isUploadingFoto = true);
 
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _isUploadingFoto = true;
-      });
-
-      if (!mounted) {
-        return;
-      }
-
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final newUrl = await authProvider.uploadFotoProfil(File(image.path));
 
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       setState(() {
         _fotoUrl = newUrl;
         _isUploadingFoto = false;
       });
-
-      if (!mounted) {
-        return;
-      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -105,18 +86,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             backgroundColor: Colors.green),
       );
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _isUploadingFoto = false;
-      });
-
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
+      setState(() => _isUploadingFoto = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal: $e'), backgroundColor: Colors.red),
       );
@@ -129,9 +100,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Reset Penguncian HP?',
             style: TextStyle(fontWeight: FontWeight.bold)),
         content: Column(
@@ -147,9 +116,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               decoration: InputDecoration(
                 labelText: 'Alasan Ganti HP',
                 hintText: 'Contoh: HP lama rusak',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
               maxLines: 2,
             ),
@@ -170,8 +138,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 return;
               }
 
-              Navigator.pop(dialogContext);
+              final authProvider =
+                  Provider.of<AuthProvider>(context, listen: false);
 
+              Navigator.pop(dialogContext);
               showDialog(
                 context: context,
                 barrierDismissible: false,
@@ -180,57 +150,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
               );
 
               try {
-                if (!mounted) {
-                  return;
-                }
-
-                final authProvider =
-                    Provider.of<AuthProvider>(context, listen: false);
-
                 final sukses = await authProvider.ajukanResetDevice(alasan);
 
-                if (!mounted) {
-                  return;
-                }
-
+                if (!mounted) return;
                 Navigator.pop(context);
 
                 if (sukses) {
-                  if (!mounted) {
-                    return;
-                  }
-
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                         content: Text(
                             'Pengajuan berhasil dikirim! Silakan hubungi admin.'),
                         backgroundColor: Colors.green),
                   );
-
                   await SecureStorageHelper.clearAll();
 
-                  if (!mounted) {
-                    return;
-                  }
-
+                  if (!mounted) return;
                   Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const LoginScreen()),
-                    (route) => false,
-                  );
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const LoginScreen()),
+                      (route) => false);
                 }
               } catch (e) {
-                if (!mounted) {
-                  return;
-                }
-
+                if (!mounted) return;
                 Navigator.pop(context);
-
-                if (!mounted) {
-                  return;
-                }
-
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                       content: Text(e.toString()), backgroundColor: Colors.red),
@@ -262,9 +205,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               decoration: BoxDecoration(
                 color: Colors.blue[700],
                 borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(40),
-                  bottomRight: Radius.circular(40),
-                ),
+                    bottomLeft: Radius.circular(40),
+                    bottomRight: Radius.circular(40)),
               ),
             ),
           ),
@@ -277,18 +219,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Row(
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white),
-                        onPressed: () => Navigator.pop(context),
-                      ),
+                          icon:
+                              const Icon(Icons.arrow_back, color: Colors.white),
+                          onPressed: () => Navigator.pop(context)),
                       const SizedBox(width: 8),
-                      const Text(
-                        'Profil Siswa',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5),
-                      ),
+                      const Text('Profil Siswa',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5)),
                       const SizedBox(width: 48),
                     ],
                   ),
@@ -300,6 +240,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24.0),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           ProfileCard(
                             namaSiswa: _namaSiswa,
@@ -309,6 +250,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             getValidUrl: _getValidFotoUrl,
                           ),
                           const SizedBox(height: 32),
+
+                          // --- TAMBAHAN: MENU PERIZINAN ---
+                          const Text(
+                            'Kehadiran & Izin',
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black54),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildMenuItem(
+                            icon: Icons.assignment_turned_in_rounded,
+                            title: 'Riwayat Izin & Sakit',
+                            onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const RiwayatIzinScreen())),
+                          ),
+                          const SizedBox(height: 32),
+                          // -------------------------------
+
                           SecurityMenu(onResetTap: _ajukanReset),
                           const SizedBox(height: 40),
                         ],
@@ -320,6 +282,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Helper widget untuk menu item agar kode tetap bersih (Clean Code)
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Color iconColor = Colors.blue,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: iconColor, size: 20),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+              fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
+        ),
+        trailing: const Icon(Icons.chevron_right_rounded,
+            color: Colors.grey, size: 20),
+        onTap: onTap,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }

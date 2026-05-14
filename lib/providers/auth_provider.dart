@@ -47,10 +47,9 @@ class AuthProvider with ChangeNotifier {
         debugPrint('Gagal mendapat FCM Token: $e');
       }
 
-      // PERBAIKAN: Tambahkan parameter password (dikirim sama dengan NIS jika default)
       FormData formData = FormData.fromMap({
         'nis': nis,
-        'password': nis, // <-- Wajib ada untuk lolos validasi CI4
+        'password': nis,
         'device_id': deviceId,
         'fcm_token': fcmToken ?? '',
       });
@@ -63,13 +62,19 @@ class AuthProvider with ChangeNotifier {
       debugPrint('Respon Server CI4: ${response.data}');
 
       if (response.statusCode == 200 || response.data['status'] == 200) {
-        var responseData = response.data['data'];
+        // Ekstrak token dari level atas (root), bukan dari dalam 'data'
+        String token = response.data['token'] ?? '';
 
-        String token = responseData['token'] ?? '';
+        var responseData = response.data['data'] ?? {};
+
         String nama = responseData['nama_siswa'] ??
             responseData['nama_lengkap'] ??
             'Siswa';
         String foto = responseData['foto_profil'] ?? responseData['foto'] ?? '';
+
+        if (token.isEmpty) {
+          throw 'Server tidak mengembalikan Token keamanan.';
+        }
 
         await SecureStorageHelper.saveToken(token);
         await SecureStorageHelper.saveUserName(nama);
@@ -115,7 +120,7 @@ class AuthProvider with ChangeNotifier {
       });
 
       final response = await ApiClient().dio.post(
-            '/profile/uploadFoto', // Sesuaikan endpoint dengan CI4
+            '/profile/upload-foto', // Sesuai dengan rute CI4
             data: formData,
             options: Options(
               headers: {
@@ -125,10 +130,16 @@ class AuthProvider with ChangeNotifier {
           );
 
       if (response.statusCode == 200) {
-        String urlBaru =
-            response.data['data']['foto_url'] ?? response.data['foto_url'];
-        await SecureStorageHelper.setFotoProfile(urlBaru);
-        return urlBaru;
+        // Sesuaikan penangkapan data dengan response dari CI4 ('foto_profil')
+        String namaFoto = response.data['foto_profil'] ?? '';
+
+        if (namaFoto.isEmpty) {
+          throw 'Server tidak mengembalikan nama foto.';
+        }
+
+        // Simpan nama/path foto ke memori lokal
+        await SecureStorageHelper.setFotoProfile(namaFoto);
+        return namaFoto;
       } else {
         throw response.data['message'] ?? 'Gagal mengunggah foto.';
       }
@@ -143,8 +154,6 @@ class AuthProvider with ChangeNotifier {
     try {
       String? token = await SecureStorageHelper.getToken();
 
-      // PERBAIKAN: Gunakan variabel token sebagai validasi untuk mencegah Warning Unused Variable
-      // sekaligus memberikan proteksi sesi ekstra jika token di lokal sudah terhapus
       if (token == null) {
         throw 'Sesi Anda telah habis. Silakan login ulang.';
       }
@@ -152,7 +161,7 @@ class AuthProvider with ChangeNotifier {
       FormData formData = FormData.fromMap({'alasan': alasan});
 
       final response = await ApiClient().dio.post(
-            '/auth/resetDevice', // Sesuaikan dengan CI4
+            '/auth/resetDevice',
             data: formData,
           );
 
