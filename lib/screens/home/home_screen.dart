@@ -2,8 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:dio/dio.dart'; // Dibutuhkan untuk FormData
-import 'package:firebase_messaging/firebase_messaging.dart'; // <-- IMPORT FCM BARU
+import 'package:dio/dio.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/utils/secure_storage_helper.dart';
@@ -29,6 +29,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _namaSiswa = 'Siswa';
+  String _namaKelas = 'Siswa Aktif';
   String? _fotoUrl;
   Timer? _timer;
 
@@ -52,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadProfileData();
-    _updateFCMToken(); // <-- EKSEKUSI PEMBARUAN TOKEN OTOMATIS SAAT BERANDA DIBUKA
+    _updateFCMToken();
     _refreshSemuaData();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -70,9 +71,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // ====================================================================
-  // FUNGSI SILUMAN: Memperbarui Token FCM ke Database CI4 Tanpa Terlihat
-  // ====================================================================
   Future<void> _updateFCMToken() async {
     try {
       String? fcmToken = await FirebaseMessaging.instance.getToken();
@@ -89,9 +87,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadProfileData() async {
     String? nama = await SecureStorageHelper.getUserName();
     String? foto = await SecureStorageHelper.getFotoProfile();
+    String? kelas = await SecureStorageHelper.getUserKelas();
+
     if (!mounted) return;
     setState(() {
       _namaSiswa = nama ?? 'Siswa';
+      _namaKelas = kelas ?? 'Siswa Aktif';
       _fotoUrl = foto;
     });
   }
@@ -103,38 +104,55 @@ class _HomeScreenState extends State<HomeScreen> {
       _isMemuatLokasi = true;
     });
 
-    final serverData = await ApiClient.getServerData();
-    if (!mounted) return;
+    try {
+      final serverData = await ApiClient.getServerData();
+      if (!mounted) return;
 
-    if (serverData != null) {
-      setState(() {
-        _waktuServer = serverData['waktu'];
-        _isLibur = serverData['is_libur'] ?? false;
-        _namaLibur = serverData['nama_libur'] ?? '';
-        _jamMasukServer = serverData['jam_masuk'];
-        _jamPulangServer = serverData['jam_pulang'];
-        _latSekolah = serverData['lat_sekolah'];
-        _lonSekolah = serverData['lon_sekolah'];
-        _radius = serverData['radius'];
-        _isMemuatWaktu = false;
-      });
-    } else {
+      if (serverData != null) {
+        setState(() {
+          _waktuServer = serverData['waktu'];
+          _isLibur = serverData['is_libur'] ?? false;
+          _namaLibur =
+              serverData['nama_libur'] ?? serverData['keterangan'] ?? '';
+
+          _jamMasukServer = serverData['jam_masuk'] ?? "07:00:00";
+          _jamPulangServer = serverData['jam_pulang'] ?? "15:00:00";
+
+          _latSekolah =
+              double.tryParse(serverData['lat_sekolah']?.toString() ?? '0.0') ??
+                  0.0;
+          _lonSekolah =
+              double.tryParse(serverData['lon_sekolah']?.toString() ?? '0.0') ??
+                  0.0;
+          _radius =
+              double.tryParse(serverData['radius']?.toString() ?? '50.0') ??
+                  50.0;
+
+          _isMemuatWaktu = false;
+        });
+      } else {
+        setState(() => _isMemuatWaktu = false);
+      }
+
+      if (_waktuServer != null) {
+        String tanggalHariIni =
+            "${_waktuServer!.year}-${_waktuServer!.month.toString().padLeft(2, '0')}-${_waktuServer!.day.toString().padLeft(2, '0')}";
+        try {
+          final absenHariIni =
+              await Provider.of<AbsensiProvider>(context, listen: false)
+                  .cekAbsenHariIni(tanggalHariIni);
+          if (!mounted) return;
+          setState(() => _dataAbsenHariIni = absenHariIni);
+        } catch (e) {
+          if (e.toString() == 'sesi_habis') _prosesLogoutExpired();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetch waktu server: $e');
+      if (!mounted) return;
       setState(() => _isMemuatWaktu = false);
     }
 
-    if (_waktuServer != null) {
-      String tanggalHariIni =
-          "${_waktuServer!.year}-${_waktuServer!.month.toString().padLeft(2, '0')}-${_waktuServer!.day.toString().padLeft(2, '0')}";
-      try {
-        final absenHariIni =
-            await Provider.of<AbsensiProvider>(context, listen: false)
-                .cekAbsenHariIni(tanggalHariIni);
-        if (!mounted) return;
-        setState(() => _dataAbsenHariIni = absenHariIni);
-      } catch (e) {
-        if (e.toString() == 'sesi_habis') _prosesLogoutExpired();
-      }
-    }
     await _updateLokasiJarak();
     if (!mounted) return;
     Provider.of<PengumumanProvider>(context, listen: false).fetchPengumuman();
@@ -142,6 +160,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _updateLokasiJarak() async {
     try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw Exception('GPS tidak aktif');
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw Exception('Izin lokasi ditolak');
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        throw Exception('Izin lokasi diblokir permanen');
+      }
+
       Position pos = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
       if (!mounted) return;
@@ -152,6 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _isMemuatLokasi = false;
       });
     } catch (e) {
+      debugPrint('Error lokasi: $e');
       if (!mounted) return;
       setState(() {
         _jarakMeter = null;
@@ -201,8 +237,10 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
-                  decoration:
-                      BoxDecoration(color: color[50], shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                      color: color[50],
+                      shape: BoxShape
+                          .circle), // PERBAIKAN: BoxBoxes -> BoxDecoration
                   child: Icon(icon, color: color[700], size: 24),
                 ),
                 const SizedBox(height: 16),
@@ -310,9 +348,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ? Icons.medical_services_rounded
                 : Icons.info_outline_rounded;
             isTombolDisable = true;
-          }
-          // LOGIKA BYPASS DISPENSASI
-          else if (statusAbsenServer == 'Dispensasi') {
+          } else if (statusAbsenServer == 'Dispensasi') {
             statusHariIni = 'Dispensasi Luar';
             warnaStatus = Colors.teal;
 
@@ -392,6 +428,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       HomeHeader(
                         namaSiswa: _namaSiswa,
+                        namaKelas: _namaKelas,
                         fotoUrl: _fotoUrl,
                         waktuServer: _waktuServer,
                         onRefreshProfile: _loadProfileData,
@@ -506,7 +543,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   latSekolah: _latSekolah,
                                   lonSekolah: _lonSekolah,
                                   radius: _radius,
-                                )));
+                                ))); // PERBAIKAN: loop))) -> )));
                     _refreshSemuaData();
                   },
             style: ElevatedButton.styleFrom(

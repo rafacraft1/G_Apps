@@ -5,9 +5,10 @@ class SecureStorageHelper {
 
   static const _keyToken = 'token';
   static const _keyName = 'user_name';
-  static const _keyNis = 'user_nis'; // <-- KUNCI BARU UNTUK NIS
-  static const _keyFoto = 'user_foto'; // <-- KUNCI BARU UNTUK FOTO
-  static const _keyBoundUser = 'bound_user'; // <-- KUNCI PERMANEN HP[cite: 7]
+  static const _keyNis = 'user_nis';
+  static const _keyFoto = 'user_foto';
+  static const _keyKelas = 'user_kelas'; // <-- KUNCI BARU UNTUK KELAS
+  static const _keyBoundUser = 'bound_user';
 
   static Future<void> saveToken(String token) async {
     await _storage.write(key: _keyToken, value: token);
@@ -25,7 +26,6 @@ class SecureStorageHelper {
     return await _storage.read(key: _keyName);
   }
 
-  // === FUNGSI BARU: Simpan & Ambil NIS ===
   static Future<void> saveUserNis(String nis) async {
     await _storage.write(key: _keyNis, value: nis);
   }
@@ -34,7 +34,6 @@ class SecureStorageHelper {
     return await _storage.read(key: _keyNis);
   }
 
-  // === FUNGSI BARU: Simpan & Ambil Foto ===
   static Future<void> setFotoProfile(String url) async {
     await _storage.write(key: _keyFoto, value: url);
   }
@@ -43,7 +42,16 @@ class SecureStorageHelper {
     return await _storage.read(key: _keyFoto);
   }
 
-  // === DEVICE BINDING LOKAL ===[cite: 7]
+  // === FUNGSI BARU: Simpan & Ambil Kelas ===
+  static Future<void> saveUserKelas(String kelas) async {
+    await _storage.write(key: _keyKelas, value: kelas);
+  }
+
+  static Future<String?> getUserKelas() async {
+    return await _storage.read(key: _keyKelas);
+  }
+
+  // === DEVICE BINDING LOKAL ===
   static Future<void> setBoundUser(String nis) async {
     await _storage.write(key: _keyBoundUser, value: nis);
   }
@@ -56,12 +64,13 @@ class SecureStorageHelper {
     await _storage.delete(key: _keyBoundUser);
   }
 
-  // === FUNGSI LOGOUT (HANYA HAPUS SESI) ===[cite: 7]
+  // === FUNGSI LOGOUT (HANYA HAPUS SESI) ===
   static Future<void> clearAll() async {
     await _storage.delete(key: _keyToken);
     await _storage.delete(key: _keyName);
-    await _storage.delete(key: _keyNis); // Hapus sesi NIS
-    await _storage.delete(key: _keyFoto); // Hapus sesi Foto
-    // CATATAN: _keyBoundUser SENGAJA TIDAK DIHAPUS agar HP tetap terkunci[cite: 7]
+    await _storage.delete(key: _keyNis);
+    await _storage.delete(key: _keyFoto);
+    await _storage.delete(key: _keyKelas); // <-- Hapus sesi Kelas
+    // CATATAN: _keyBoundUser SENGAJA TIDAK DIHAPUS agar HP tetap terkunci
   }
 }

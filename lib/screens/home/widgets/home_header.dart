@@ -5,6 +5,7 @@ import '../../profile/profile_screen.dart';
 
 class HomeHeader extends StatelessWidget {
   final String namaSiswa;
+  final String namaKelas; // PENAMBAHAN PARAMETER BARU
   final String? fotoUrl;
   final DateTime? waktuServer;
   final VoidCallback onRiwayatTap;
@@ -14,6 +15,7 @@ class HomeHeader extends StatelessWidget {
   const HomeHeader({
     super.key,
     required this.namaSiswa,
+    required this.namaKelas, // DIWAJIBKAN DI KONSTRUKTOR
     this.fotoUrl,
     required this.waktuServer,
     required this.onRiwayatTap,
@@ -175,6 +177,20 @@ class HomeHeader extends StatelessWidget {
                               color: Colors.white,
                               fontSize: 22,
                               fontWeight: FontWeight.w900),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4), // Jeda Spacing Elegan
+                        // PENAMBAHAN: Render Teks Nama Kelas di Bawah Nama Siswa
+                        Text(
+                          namaKelas != 'Siswa Aktif'
+                              ? 'Kelas $namaKelas'
+                              : 'Siswa Aktif',
+                          style: TextStyle(
+                              color: Colors.blue[50]!.withOpacity(0.9),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),

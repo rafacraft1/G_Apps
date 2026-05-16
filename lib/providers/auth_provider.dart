@@ -62,9 +62,8 @@ class AuthProvider with ChangeNotifier {
       debugPrint('Respon Server CI4: ${response.data}');
 
       if (response.statusCode == 200 || response.data['status'] == 200) {
-        // Ekstrak token dari level atas (root), bukan dari dalam 'data'
+        // Ekstrak token dari level atas (root)
         String token = response.data['token'] ?? '';
-
         var responseData = response.data['data'] ?? {};
 
         String nama = responseData['nama_siswa'] ??
@@ -72,13 +71,20 @@ class AuthProvider with ChangeNotifier {
             'Siswa';
         String foto = responseData['foto_profil'] ?? responseData['foto'] ?? '';
 
+        // PENAMBAHAN: Tangkap nama kelas secara dinamis
+        String kelas = responseData['nama_kelas'] ??
+            responseData['kelas'] ??
+            'Siswa Aktif';
+
         if (token.isEmpty) {
           throw 'Server tidak mengembalikan Token keamanan.';
         }
 
+        // Simpan semua data ke memori lokal
         await SecureStorageHelper.saveToken(token);
         await SecureStorageHelper.saveUserName(nama);
         await SecureStorageHelper.saveUserNis(nis);
+        await SecureStorageHelper.saveUserKelas(kelas); // Simpan Kelas
 
         if (foto.isNotEmpty) {
           await SecureStorageHelper.setFotoProfile(foto);
@@ -120,7 +126,7 @@ class AuthProvider with ChangeNotifier {
       });
 
       final response = await ApiClient().dio.post(
-            '/profile/upload-foto', // Sesuai dengan rute CI4
+            '/profile/upload-foto',
             data: formData,
             options: Options(
               headers: {
@@ -130,14 +136,12 @@ class AuthProvider with ChangeNotifier {
           );
 
       if (response.statusCode == 200) {
-        // Sesuaikan penangkapan data dengan response dari CI4 ('foto_profil')
         String namaFoto = response.data['foto_profil'] ?? '';
 
         if (namaFoto.isEmpty) {
           throw 'Server tidak mengembalikan nama foto.';
         }
 
-        // Simpan nama/path foto ke memori lokal
         await SecureStorageHelper.setFotoProfile(namaFoto);
         return namaFoto;
       } else {

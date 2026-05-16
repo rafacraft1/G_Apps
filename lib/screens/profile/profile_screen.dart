@@ -21,6 +21,8 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   String _namaSiswa = 'Memuat...';
+  String _namaKelas =
+      'Siswa Aktif'; // PENAMBAHAN: State untuk menampung nama kelas
   String? _fotoUrl;
   bool _isUploadingFoto = false;
 
@@ -35,12 +37,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _loadData() async {
     final nama = await SecureStorageHelper.getUserName();
     final foto = await SecureStorageHelper.getFotoProfile();
+    final kelas = await SecureStorageHelper
+        .getUserKelas(); // PENAMBAHAN: Ambil data kelas dari storage
 
     if (!mounted) return;
 
     setState(() {
       _namaSiswa = nama ?? 'Siswa';
       _fotoUrl = foto;
+      _namaKelas = kelas ?? 'Siswa Aktif'; // PENAMBAHAN: Set state kelas
     });
   }
 
@@ -244,6 +249,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         children: [
                           ProfileCard(
                             namaSiswa: _namaSiswa,
+                            namaKelas:
+                                _namaKelas, // PENAMBAHAN: Lempar parameter nama kelas ke widget ProfileCard
                             fotoUrl: _fotoUrl,
                             isUploading: _isUploadingFoto,
                             onUploadTap: _pilihDanUploadFoto,

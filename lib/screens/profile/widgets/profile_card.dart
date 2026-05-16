@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 class ProfileCard extends StatelessWidget {
   final String namaSiswa;
+  final String namaKelas; // Parameter yang menyelesaikan error Anda
   final String? fotoUrl;
   final bool isUploading;
   final VoidCallback onUploadTap;
@@ -11,6 +12,7 @@ class ProfileCard extends StatelessWidget {
   const ProfileCard({
     super.key,
     required this.namaSiswa,
+    required this.namaKelas, // Diwajibkan di konstruktor
     required this.fotoUrl,
     required this.isUploading,
     required this.onUploadTap,
@@ -59,7 +61,10 @@ class ProfileCard extends StatelessWidget {
                   border: Border.all(color: Colors.blue[100]!),
                 ),
                 child: Text(
-                  'Siswa Aktif',
+                  // Menampilkan data kelas dinamis
+                  namaKelas != 'Siswa Aktif'
+                      ? 'Kelas $namaKelas'
+                      : 'Siswa Aktif',
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.blue[700],
