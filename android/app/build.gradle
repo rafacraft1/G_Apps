@@ -2,6 +2,7 @@ plugins {
     id "com.android.application"
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services"
 }
 
 def localProperties = new Properties()
@@ -24,7 +25,9 @@ if (flutterVersionName == null) {
 
 android {
     namespace "com.example.geofence_app"
-    compileSdk flutter.compileSdkVersion
+    
+    // SDK 35 untuk sinkronisasi Workmanager
+    compileSdk 35 
     ndkVersion "25.1.8937393"
 
     compileOptions {
@@ -43,15 +46,14 @@ android {
     defaultConfig {
         applicationId "com.example.geofence_app"
         minSdkVersion 21
-        targetSdkVersion flutter.targetSdkVersion
+        
+        targetSdkVersion 35 
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig signingConfigs.debug
         }
     }
@@ -60,6 +62,3 @@ android {
 flutter {
     source '../..'
 }
-
-dependencies {}
-apply plugin: 'com.google.gms.google-services'

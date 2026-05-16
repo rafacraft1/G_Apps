@@ -66,12 +66,17 @@ class AuthProvider with ChangeNotifier {
         String token = response.data['token'] ?? '';
         var responseData = response.data['data'] ?? {};
 
+        // PENAMBAHAN: Tangkap ID Siswa secara dinamis (antisipasi key 'id_siswa' atau 'id')
+        String idSiswa = responseData['id_siswa']?.toString() ??
+            responseData['id']?.toString() ??
+            '';
+
         String nama = responseData['nama_siswa'] ??
             responseData['nama_lengkap'] ??
             'Siswa';
         String foto = responseData['foto_profil'] ?? responseData['foto'] ?? '';
 
-        // PENAMBAHAN: Tangkap nama kelas secara dinamis
+        // Tangkap nama kelas secara dinamis
         String kelas = responseData['nama_kelas'] ??
             responseData['kelas'] ??
             'Siswa Aktif';
@@ -80,11 +85,17 @@ class AuthProvider with ChangeNotifier {
           throw 'Server tidak mengembalikan Token keamanan.';
         }
 
+        if (idSiswa.isEmpty) {
+          throw 'Server tidak mengembalikan ID Siswa.';
+        }
+
         // Simpan semua data ke memori lokal
         await SecureStorageHelper.saveToken(token);
+        await SecureStorageHelper.saveUserId(
+            idSiswa); // <-- INJEKSI PENYIMPANAN ID SISWA
         await SecureStorageHelper.saveUserName(nama);
         await SecureStorageHelper.saveUserNis(nis);
-        await SecureStorageHelper.saveUserKelas(kelas); // Simpan Kelas
+        await SecureStorageHelper.saveUserKelas(kelas);
 
         if (foto.isNotEmpty) {
           await SecureStorageHelper.setFotoProfile(foto);

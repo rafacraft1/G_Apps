@@ -7,8 +7,11 @@ class SecureStorageHelper {
   static const _keyName = 'user_name';
   static const _keyNis = 'user_nis';
   static const _keyFoto = 'user_foto';
-  static const _keyKelas = 'user_kelas'; // <-- KUNCI BARU UNTUK KELAS
+  static const _keyKelas = 'user_kelas';
   static const _keyBoundUser = 'bound_user';
+
+  // === KUNCI BARU UNTUK ID SISWA ===
+  static const _keyUserId = 'user_id';
 
   static Future<void> saveToken(String token) async {
     await _storage.write(key: _keyToken, value: token);
@@ -16,6 +19,15 @@ class SecureStorageHelper {
 
   static Future<String?> getToken() async {
     return await _storage.read(key: _keyToken);
+  }
+
+  // === FUNGSI BARU: Simpan & Ambil ID Siswa ===
+  static Future<void> saveUserId(String id) async {
+    await _storage.write(key: _keyUserId, value: id);
+  }
+
+  static Future<String?> getUserId() async {
+    return await _storage.read(key: _keyUserId);
   }
 
   static Future<void> saveUserName(String name) async {
@@ -42,7 +54,6 @@ class SecureStorageHelper {
     return await _storage.read(key: _keyFoto);
   }
 
-  // === FUNGSI BARU: Simpan & Ambil Kelas ===
   static Future<void> saveUserKelas(String kelas) async {
     await _storage.write(key: _keyKelas, value: kelas);
   }
@@ -51,7 +62,6 @@ class SecureStorageHelper {
     return await _storage.read(key: _keyKelas);
   }
 
-  // === DEVICE BINDING LOKAL ===
   static Future<void> setBoundUser(String nis) async {
     await _storage.write(key: _keyBoundUser, value: nis);
   }
@@ -64,13 +74,12 @@ class SecureStorageHelper {
     await _storage.delete(key: _keyBoundUser);
   }
 
-  // === FUNGSI LOGOUT (HANYA HAPUS SESI) ===
   static Future<void> clearAll() async {
     await _storage.delete(key: _keyToken);
     await _storage.delete(key: _keyName);
     await _storage.delete(key: _keyNis);
     await _storage.delete(key: _keyFoto);
-    await _storage.delete(key: _keyKelas); // <-- Hapus sesi Kelas
-    // CATATAN: _keyBoundUser SENGAJA TIDAK DIHAPUS agar HP tetap terkunci
+    await _storage.delete(key: _keyKelas);
+    await _storage.delete(key: _keyUserId); // Hapus juga saat logout
   }
 }

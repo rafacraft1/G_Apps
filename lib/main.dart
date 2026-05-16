@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:workmanager/workmanager.dart';
 
 // Import Provider
 import 'providers/auth_provider.dart';
@@ -13,59 +12,42 @@ import 'providers/absensi_provider.dart';
 import 'providers/izin_provider.dart';
 
 // Import Helper & Screen
-import 'core/utils/secure_storage_helper.dart';
 import 'screens/splash/splash_screen.dart';
 
+// Import Tracking Service Baru
+import 'services/tracking_service.dart';
+
 // =====================================================================
-// FUNGSI INTI PELACAKAN (DIPAKAI OLEH FOREGROUND & BACKGROUND)
+// 1. MESIN BACKGROUND 15 MENIT (WORKMANAGER)
+// =====================================================================
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((task, inputData) async {
+    if (task == 'periodic_tracking') {
+      // Karena ini berjalan di Isolate terpisah, harus inisialisasi ulang
+      WidgetsFlutterBinding.ensureInitialized();
+      // Panggil fungsi simpan memori lokal (FIFO 3 Data)
+      await TrackingService.saveLocationPeriodic();
+    }
+    return Future.value(true);
+  });
+}
+
+// =====================================================================
+// 2. FUNGSI INTI PELACAKAN (DIPAKAI OLEH FOREGROUND & BACKGROUND FCM)
 // =====================================================================
 Future<void> _prosesSinyalTracking(RemoteMessage message, String tipe) async {
   debugPrint("Sinyal Ping $tipe Diterima: ${message.data}");
 
-  // PERBAIKAN 1: Sesuaikan dengan payload yang dikirim dari Admin CI4
-  if (message.data['action'] == 'fetch_location') {
-    try {
-      String? token = await SecureStorageHelper.getToken();
-      if (token == null) return;
-
-      Position posisi = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      String baseUrl =
-          dotenv.env['BASE_URL'] ?? 'http://192.168.0.105:8080/api/v1';
-
-      Dio dio = Dio(BaseOptions(
-        baseUrl: baseUrl,
-        connectTimeout: const Duration(seconds: 15),
-      ));
-
-      FormData formData = FormData.fromMap({
-        'lat': posisi.latitude,
-        'long': posisi.longitude,
-      });
-
-      // PERBAIKAN 2: Sesuaikan rute dengan TrackingApi.php di backend
-      await dio.post(
-        '/tracking/updateLokasi',
-        data: formData,
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/json',
-          },
-        ),
-      );
-
-      debugPrint("BERHASIL: Lokasi dikirim dari $tipe ke Server!");
-    } catch (e) {
-      debugPrint("GAGAL: Mengirim lokasi $tipe. Error: $e");
-    }
+  // Cocokkan payload dengan Controller CI4 ('action' => 'force_location_capture')
+  if (message.data['action'] == 'force_location_capture') {
+    // Tembakkan 4 data lokasi (3 lokal + 1 saat ini) ke web CI4
+    await TrackingService.sendLocationOnDemand();
   }
 }
 
 // =====================================================================
-// BACKGROUND HANDLER (WAJIB TOP-LEVEL FUNCTION)
+// 3. BACKGROUND HANDLER UNTUK FCM (SAAT APLIKASI DITUTUP/BACKGROUND)
 // =====================================================================
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -79,10 +61,32 @@ void main() async {
   await dotenv.load(fileName: ".env");
   await Firebase.initializeApp();
 
-  // 1. Daftarkan PINTU BELAKANG
+  // ---------------------------------------------------------
+  // INISIALISASI WORKMANAGER (TRACKING 15 MENIT)
+  // ---------------------------------------------------------
+  Workmanager().initialize(
+    callbackDispatcher,
+    isInDebugMode: false, // Set true jika ingin melihat log debug Workmanager
+  );
+
+  Workmanager().registerPeriodicTask(
+    "tracking_15m_task",
+    "periodic_tracking",
+    frequency: const Duration(minutes: 15),
+    constraints: Constraints(
+      // Tidak butuh internet untuk simpan memori lokal, hanya perlu device aktif
+      networkType: NetworkType.not_required,
+      requiresDeviceIdle: false,
+    ),
+  );
+
+  // ---------------------------------------------------------
+  // INISIALISASI FCM (TRIGGER DARI WEB ADMIN)
+  // ---------------------------------------------------------
+  // Daftarkan PINTU BELAKANG
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // 2. Daftarkan PINTU DEPAN
+  // Daftarkan PINTU DEPAN
   FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
     await _prosesSinyalTracking(message, "Layar Aktif (Foreground)");
   });
