@@ -32,15 +32,17 @@ dependencies:
   image_picker: ^1.0.0
   cached_network_image: ^3.4.0
   url_launcher: ^6.3.1
-  syncfusion_flutter_pdfviewer: 24.2.9 # Diubah ke versi stabil untuk SDK Anda
+  syncfusion_flutter_pdfviewer: 24.2.9
   workmanager: ^0.7.0
   shared_preferences: ^2.2.3
+  
+  # Package dipindahkan ke dependencies utama
+  flutter_native_splash: ^2.4.0 
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  flutter_native_splash: ^2.4.0
   flutter_launcher_icons: ^0.14.4
 
 flutter:
@@ -49,10 +51,11 @@ flutter:
     - .env
     - assets/animations/
 
+# Konfigurasi Native Splash Screen (Warna disamakan dengan Colors.blue[600])
 flutter_native_splash:
-  color: "#ffffff" 
+  color: "#1E88E5" 
   android_12:
-    color: "#ffffff"
+    color: "#1E88E5"
 
 flutter_launcher_icons:
   android: "launcher_icon"

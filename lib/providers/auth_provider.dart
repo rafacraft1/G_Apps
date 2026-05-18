@@ -61,12 +61,24 @@ class AuthProvider with ChangeNotifier {
 
       debugPrint('Respon Server CI4: ${response.data}');
 
-      if (response.statusCode == 200 || response.data['status'] == 200) {
+      // PERBAIKAN: Pengecekan aman terhadap tipe data Map (JSON)
+      // Mencegah aplikasi crash jika CI4 membuang error berbentuk teks/HTML
+      bool isSuccess = response.statusCode == 200;
+      if (!isSuccess && response.data is Map) {
+        isSuccess = response.data['status'] == 200;
+      }
+
+      if (isSuccess) {
+        // Validasi ekstra memastikan format payload bisa dibaca sebagai Map
+        if (response.data is! Map) {
+          throw 'Format respon dari server tidak valid (bukan JSON).';
+        }
+
         // Ekstrak token dari level atas (root)
         String token = response.data['token'] ?? '';
         var responseData = response.data['data'] ?? {};
 
-        // PENAMBAHAN: Tangkap ID Siswa secara dinamis (antisipasi key 'id_siswa' atau 'id')
+        // Tangkap ID Siswa secara dinamis (antisipasi key 'id_siswa' atau 'id')
         String idSiswa = responseData['id_siswa']?.toString() ??
             responseData['id']?.toString() ??
             '';
@@ -91,8 +103,7 @@ class AuthProvider with ChangeNotifier {
 
         // Simpan semua data ke memori lokal
         await SecureStorageHelper.saveToken(token);
-        await SecureStorageHelper.saveUserId(
-            idSiswa); // <-- INJEKSI PENYIMPANAN ID SISWA
+        await SecureStorageHelper.saveUserId(idSiswa);
         await SecureStorageHelper.saveUserName(nama);
         await SecureStorageHelper.saveUserNis(nis);
         await SecureStorageHelper.saveUserKelas(kelas);
@@ -105,13 +116,21 @@ class AuthProvider with ChangeNotifier {
 
         return true;
       } else {
-        throw response.data['message'] ?? 'Login gagal';
+        // PERBAIKAN: Penanganan error aman membaca Map
+        if (response.data is Map) {
+          throw response.data['message'] ?? 'Login gagal';
+        } else {
+          throw 'Terjadi kesalahan sistem di server. Silakan hubungi admin.';
+        }
       }
     } on DioException catch (e) {
-      if (e.response?.data != null && e.response?.data['messages'] != null) {
-        throw e.response?.data['messages']['error'] ?? 'Gagal login';
+      if (e.response?.data != null && e.response?.data is Map) {
+        if (e.response?.data['messages'] != null) {
+          throw e.response?.data['messages']['error'] ?? 'Gagal login';
+        }
+        throw e.response?.data['message'] ?? 'Gagal menghubungi server.';
       }
-      throw e.response?.data['message'] ?? 'Gagal menghubungi server.';
+      throw 'Gagal menghubungi server atau jaringan terputus.';
     } catch (e) {
       throw e.toString();
     } finally {
@@ -147,6 +166,8 @@ class AuthProvider with ChangeNotifier {
           );
 
       if (response.statusCode == 200) {
+        if (response.data is! Map) throw 'Format data tidak valid.';
+
         String namaFoto = response.data['foto_profil'] ?? '';
 
         if (namaFoto.isEmpty) {
@@ -156,10 +177,16 @@ class AuthProvider with ChangeNotifier {
         await SecureStorageHelper.setFotoProfile(namaFoto);
         return namaFoto;
       } else {
-        throw response.data['message'] ?? 'Gagal mengunggah foto.';
+        if (response.data is Map) {
+          throw response.data['message'] ?? 'Gagal mengunggah foto.';
+        }
+        throw 'Gagal mengunggah foto karena kesalahan server.';
       }
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Gagal menghubungi server.';
+      if (e.response?.data is Map) {
+        throw e.response?.data['message'] ?? 'Gagal menghubungi server.';
+      }
+      throw 'Koneksi ke server terputus.';
     } catch (e) {
       throw e.toString();
     }
@@ -186,7 +213,10 @@ class AuthProvider with ChangeNotifier {
       }
       return false;
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Gagal mengajukan reset device.';
+      if (e.response?.data is Map) {
+        throw e.response?.data['message'] ?? 'Gagal mengajukan reset device.';
+      }
+      throw 'Terjadi kesalahan sistem pada server.';
     } catch (e) {
       throw 'Terjadi kesalahan sistem.';
     }
