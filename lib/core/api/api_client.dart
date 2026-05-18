@@ -7,19 +7,23 @@ class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
   late Dio dio;
 
-  // Pastikan URL mengarah ke folder /api
-  final String baseUrl =
-      dotenv.env['BASE_URL'] ?? 'http://192.168.0.105:8080/api/v1';
+  // Hanya mengambil dari .env
+  final String baseUrl = dotenv.env['BASE_URL'] ?? '';
 
   factory ApiClient() {
     return _instance;
   }
 
   ApiClient._internal() {
+    // Validasi untuk memastikan .env sudah terbaca dengan benar
+    if (baseUrl.isEmpty) {
+      debugPrint('Peringatan: BASE_URL di .env tidak ditemukan atau kosong.');
+    }
+
     dio = Dio(BaseOptions(
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 30),
       headers: {
         'Accept': 'application/json',
       },
@@ -45,13 +49,11 @@ class ApiClient {
 
   static Future<Map<String, dynamic>?> getServerData() async {
     try {
-      // Pastikan endpoint sesuai dengan rute di CI4
       final response = await ApiClient().dio.get('/waktu_server');
 
       if (response.data != null &&
           (response.data['status'] == 200 ||
               response.data['status'] == 'success')) {
-        // PERBAIKAN: Ambil payload dari dalam object 'data'
         var payload = response.data['data'];
 
         return {

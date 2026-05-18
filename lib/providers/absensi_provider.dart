@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -17,7 +16,6 @@ class AbsensiProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // PERBAIKAN: Ubah /absensi/riwayat menjadi /absen/riwayat agar cocok dengan Routes.php
       final response = await ApiClient().dio.get('/absen/riwayat');
 
       if (response.statusCode == 200 && response.data != null) {
@@ -36,7 +34,6 @@ class AbsensiProvider with ChangeNotifier {
 
   Future<Map<String, dynamic>?> cekAbsenHariIni(String tanggal) async {
     try {
-      // PERBAIKAN: Ubah /absensi/riwayat menjadi /absen/riwayat
       final response = await ApiClient().dio.get('/absen/riwayat');
 
       if (response.statusCode == 200 && response.data != null) {
@@ -50,7 +47,6 @@ class AbsensiProvider with ChangeNotifier {
       return null;
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
-        // Ini yang memicu pesan "Sesi Habis" di HomeScreen jika rute salah/token ditolak
         throw 'sesi_habis';
       }
       return null;
@@ -64,8 +60,10 @@ class AbsensiProvider with ChangeNotifier {
     required double lat,
     required double lon,
     required bool isMocked,
-    required String tipeAbsen, // 'masuk' atau 'pulang'
+    required String tipeAbsen,
   }) async {
+    File? fileToCleanUp;
+
     try {
       final filePath = foto.absolute.path;
       final extensionIndex = filePath.lastIndexOf('.');
@@ -82,17 +80,17 @@ class AbsensiProvider with ChangeNotifier {
       File finalFile =
           compressedFile != null ? File(compressedFile.path) : foto;
 
-      List<int> imageBytes = await finalFile.readAsBytes();
-      String base64Foto = "data:image/jpeg;base64,${base64Encode(imageBytes)}";
+      if (compressedFile != null) fileToCleanUp = finalFile;
 
       FormData formData = FormData.fromMap({
         'latitude': lat.toString(),
         'longitude': lon.toString(),
         'is_fake_gps': isMocked ? 1 : 0,
-        'foto': base64Foto,
+        // Menggunakan MultipartFile lebih efisien dibanding Base64
+        'foto': await MultipartFile.fromFile(finalFile.path,
+            filename: 'absen_$tipeAbsen.jpg'),
       });
 
-      // PERBAIKAN: Ubah /absensi/ menjadi /absen/
       final response = await ApiClient().dio.post(
             '/absen/$tipeAbsen',
             data: formData,
@@ -113,6 +111,11 @@ class AbsensiProvider with ChangeNotifier {
       throw pesanError;
     } catch (e) {
       throw 'Terjadi kesalahan saat memproses absensi.';
+    } finally {
+      // Hapus file sementara agar tidak terjadi penumpukan cache/storage
+      if (fileToCleanUp != null && await fileToCleanUp.exists()) {
+        await fileToCleanUp.delete();
+      }
     }
   }
 }

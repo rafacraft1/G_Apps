@@ -24,7 +24,7 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace "com.example.geofence_app"
+    namespace "id.web.nurindra.geofence_app"
     
     // SDK 35 untuk sinkronisasi Workmanager
     compileSdk 35 
@@ -44,7 +44,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.example.geofence_app"
+        applicationId "id.web.nurindra.geofence_app"
         minSdkVersion 21
         
         targetSdkVersion 35 

@@ -1,9 +1,6 @@
 import 'package:geolocator/geolocator.dart';
 
 class LocationHelper {
-  // =======================================================================
-  // FUNGSI UTAMA: Ambil Lokasi + Status Fake GPS (Mengembalikan Map)
-  // =======================================================================
   static Future<Map<String, dynamic>> getCurrentLocationWithMockStatus() async {
     bool serviceEnabled;
     LocationPermission permission;
@@ -30,7 +27,6 @@ class LocationHelper {
       desiredAccuracy: LocationAccuracy.high,
     );
 
-    // KUNCI KEAMANAN: Cek flag isMocked bawaan Geolocator
     bool isMocked = position.isMocked;
 
     return {
@@ -39,13 +35,11 @@ class LocationHelper {
     };
   }
 
-  // Fungsi untuk mendapatkan titik koordinat HP saat ini (Bawaan Lama)
   static Future<Position> getCurrentLocation() async {
     Map<String, dynamic> data = await getCurrentLocationWithMockStatus();
     return data['position'] as Position;
   }
 
-  // Fungsi untuk menghitung jarak antara 2 titik koordinat (dalam satuan Meter)
   static double hitungJarakMeter(
     double startLatitude,
     double startLongitude,

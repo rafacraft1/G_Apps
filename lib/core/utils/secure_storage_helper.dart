@@ -80,6 +80,6 @@ class SecureStorageHelper {
     await _storage.delete(key: _keyNis);
     await _storage.delete(key: _keyFoto);
     await _storage.delete(key: _keyKelas);
-    await _storage.delete(key: _keyUserId); // Hapus juga saat logout
+    await _storage.delete(key: _keyUserId);
   }
 }

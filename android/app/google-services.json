@@ -10,7 +10,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:725466006351:android:ff8637bd2ceb5c01507b3a",
         "android_client_info": {
-          "package_name": "com.example.geofence_app"
+          "package_name": "id.web.nurindra.geofence_app"
         }
       },
       "oauth_client": [],
