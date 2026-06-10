@@ -15,6 +15,7 @@ class AbsensiProvider with ChangeNotifier {
 
   static const String _cacheKey = 'riwayat_absen_cache';
 
+  /// Mengambil riwayat absensi dari API dan menyimpan ke memori lokal
   Future<void> fetchRiwayatAbsen() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -44,29 +45,22 @@ class AbsensiProvider with ChangeNotifier {
     }
   }
 
+  /// Mengecek status absensi hari ini menggunakan state memori (tanpa memanggil API kembali)
   Future<Map<String, dynamic>?> cekAbsenHariIni(String tanggal) async {
-    try {
-      final response = await ApiClient().dio.get('/absen/riwayat');
-
-      if (response.statusCode == 200 && response.data != null) {
-        List data = response.data['data'] ?? [];
-        for (var item in data) {
-          if (item['tanggal'] == tanggal) {
-            return item;
-          }
-        }
-      }
-      return null;
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 401) {
-        throw 'sesi_habis';
-      }
-      return null;
-    } catch (e) {
-      return null;
+    if (_listRiwayat.isEmpty) {
+      await fetchRiwayatAbsen();
     }
+
+    for (var item in _listRiwayat) {
+      if (item['tanggal'] == tanggal) {
+        return item;
+      }
+    }
+
+    return null;
   }
 
+  /// Mengirim data presensi masuk dan pulang
   Future<bool> kirimAbsen({
     required File foto,
     required double lat,
