@@ -10,6 +10,7 @@ class AuthProvider with ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
+  /// Mengambil Device ID berdasarkan platform OS
   Future<String> _getDeviceId() async {
     final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
     try {
@@ -26,6 +27,7 @@ class AuthProvider with ChangeNotifier {
     return 'unknown_device';
   }
 
+  /// Memproses otentikasi login
   Future<bool> login(String nis) async {
     _isLoading = true;
     notifyListeners();
@@ -38,9 +40,8 @@ class AuthProvider with ChangeNotifier {
       }
 
       String deviceId = await _getDeviceId();
-      debugPrint('Mencoba login dengan Device ID: $deviceId');
-
       String? fcmToken;
+
       try {
         fcmToken = await FirebaseMessaging.instance.getToken();
       } catch (e) {
@@ -59,26 +60,20 @@ class AuthProvider with ChangeNotifier {
             data: formData,
           );
 
-      debugPrint('Respon Server CI4: ${response.data}');
-
-      // PERBAIKAN: Pengecekan aman terhadap tipe data Map (JSON)
-      // Mencegah aplikasi crash jika CI4 membuang error berbentuk teks/HTML
       bool isSuccess = response.statusCode == 200;
       if (!isSuccess && response.data is Map) {
         isSuccess = response.data['status'] == 200;
       }
 
       if (isSuccess) {
-        // Validasi ekstra memastikan format payload bisa dibaca sebagai Map
         if (response.data is! Map) {
           throw 'Format respon dari server tidak valid (bukan JSON).';
         }
 
-        // Ekstrak token dari level atas (root)
-        String token = response.data['token'] ?? '';
+        String accessToken = response.data['access_token'] ?? '';
+        String refreshToken = response.data['refresh_token'] ?? '';
         var responseData = response.data['data'] ?? {};
 
-        // Tangkap ID Siswa secara dinamis (antisipasi key 'id_siswa' atau 'id')
         String idSiswa = responseData['id_siswa']?.toString() ??
             responseData['id']?.toString() ??
             '';
@@ -86,23 +81,23 @@ class AuthProvider with ChangeNotifier {
         String nama = responseData['nama_siswa'] ??
             responseData['nama_lengkap'] ??
             'Siswa';
+
         String foto = responseData['foto_profil'] ?? responseData['foto'] ?? '';
 
-        // Tangkap nama kelas secara dinamis
         String kelas = responseData['nama_kelas'] ??
             responseData['kelas'] ??
             'Siswa Aktif';
 
-        if (token.isEmpty) {
-          throw 'Server tidak mengembalikan Token keamanan.';
+        if (accessToken.isEmpty || refreshToken.isEmpty) {
+          throw 'Server tidak mengembalikan token keamanan.';
         }
 
         if (idSiswa.isEmpty) {
           throw 'Server tidak mengembalikan ID Siswa.';
         }
 
-        // Simpan semua data ke memori lokal
-        await SecureStorageHelper.saveToken(token);
+        await SecureStorageHelper.saveTokens(
+            access: accessToken, refresh: refreshToken);
         await SecureStorageHelper.saveUserId(idSiswa);
         await SecureStorageHelper.saveUserName(nama);
         await SecureStorageHelper.saveUserNis(nis);
@@ -116,7 +111,6 @@ class AuthProvider with ChangeNotifier {
 
         return true;
       } else {
-        // PERBAIKAN: Penanganan error aman membaca Map
         if (response.data is Map) {
           throw response.data['message'] ?? 'Login gagal';
         } else {
@@ -139,6 +133,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Memproses unggah foto profil
   Future<String> uploadFotoProfil(File fileFoto) async {
     try {
       String? token = await SecureStorageHelper.getToken();
@@ -192,6 +187,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Memproses pengajuan reset device
   Future<bool> ajukanResetDevice(String alasan) async {
     try {
       String? token = await SecureStorageHelper.getToken();

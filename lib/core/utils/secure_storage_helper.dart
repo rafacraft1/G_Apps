@@ -1,85 +1,88 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SecureStorageHelper {
-  static const _storage = FlutterSecureStorage();
+  static const _secureStorage = FlutterSecureStorage();
 
-  static const _keyToken = 'token';
+  static const _keyToken = 'access_token';
+  static const _keyRefreshToken = 'refresh_token';
+  static const _keyUserId = 'user_id';
+  static const _keyBoundUser = 'bound_user';
+
   static const _keyName = 'user_name';
   static const _keyNis = 'user_nis';
   static const _keyFoto = 'user_foto';
   static const _keyKelas = 'user_kelas';
-  static const _keyBoundUser = 'bound_user';
 
-  // === KUNCI BARU UNTUK ID SISWA ===
-  static const _keyUserId = 'user_id';
-
-  static Future<void> saveToken(String token) async {
-    await _storage.write(key: _keyToken, value: token);
+  /// Murni Secure Storage (Data Sensitif)
+  static Future<void> saveTokens(
+      {required String access, required String refresh}) async {
+    await _secureStorage.write(key: _keyToken, value: access);
+    await _secureStorage.write(key: _keyRefreshToken, value: refresh);
   }
 
-  static Future<String?> getToken() async {
-    return await _storage.read(key: _keyToken);
-  }
+  static Future<String?> getToken() async =>
+      await _secureStorage.read(key: _keyToken);
+  static Future<String?> getRefreshToken() async =>
+      await _secureStorage.read(key: _keyRefreshToken);
 
-  // === FUNGSI BARU: Simpan & Ambil ID Siswa ===
-  static Future<void> saveUserId(String id) async {
-    await _storage.write(key: _keyUserId, value: id);
-  }
+  static Future<void> saveUserId(String id) async =>
+      await _secureStorage.write(key: _keyUserId, value: id);
+  static Future<String?> getUserId() async =>
+      await _secureStorage.read(key: _keyUserId);
 
-  static Future<String?> getUserId() async {
-    return await _storage.read(key: _keyUserId);
-  }
+  static Future<void> setBoundUser(String nis) async =>
+      await _secureStorage.write(key: _keyBoundUser, value: nis);
+  static Future<String?> getBoundUser() async =>
+      await _secureStorage.read(key: _keyBoundUser);
+  static Future<void> clearDeviceBinding() async =>
+      await _secureStorage.delete(key: _keyBoundUser);
 
+  /// SharedPreferences (Data Non-Sensitif - Performa Tinggi)
   static Future<void> saveUserName(String name) async {
-    await _storage.write(key: _keyName, value: name);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyName, name);
   }
 
   static Future<String?> getUserName() async {
-    return await _storage.read(key: _keyName);
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyName);
   }
 
   static Future<void> saveUserNis(String nis) async {
-    await _storage.write(key: _keyNis, value: nis);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyNis, nis);
   }
 
   static Future<String?> getUserNis() async {
-    return await _storage.read(key: _keyNis);
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyNis);
   }
 
   static Future<void> setFotoProfile(String url) async {
-    await _storage.write(key: _keyFoto, value: url);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyFoto, url);
   }
 
   static Future<String?> getFotoProfile() async {
-    return await _storage.read(key: _keyFoto);
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyFoto);
   }
 
   static Future<void> saveUserKelas(String kelas) async {
-    await _storage.write(key: _keyKelas, value: kelas);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyKelas, kelas);
   }
 
   static Future<String?> getUserKelas() async {
-    return await _storage.read(key: _keyKelas);
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyKelas);
   }
 
-  static Future<void> setBoundUser(String nis) async {
-    await _storage.write(key: _keyBoundUser, value: nis);
-  }
-
-  static Future<String?> getBoundUser() async {
-    return await _storage.read(key: _keyBoundUser);
-  }
-
-  static Future<void> clearDeviceBinding() async {
-    await _storage.delete(key: _keyBoundUser);
-  }
-
+  /// Pembersihan Universal
   static Future<void> clearAll() async {
-    await _storage.delete(key: _keyToken);
-    await _storage.delete(key: _keyName);
-    await _storage.delete(key: _keyNis);
-    await _storage.delete(key: _keyFoto);
-    await _storage.delete(key: _keyKelas);
-    await _storage.delete(key: _keyUserId);
+    await _secureStorage.deleteAll();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
   }
 }

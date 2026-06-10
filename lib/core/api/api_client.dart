@@ -8,6 +8,8 @@ import '../../screens/auth/login_screen.dart';
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
   late Dio dio;
+  bool _isRefreshing = false;
+  final List<void Function(String)> _refreshQueue = [];
 
   final String baseUrl = dotenv.env['BASE_URL'] ?? '';
 
@@ -29,7 +31,6 @@ class ApiClient {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           String? token = await SecureStorageHelper.getToken();
-
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
@@ -37,17 +38,77 @@ class ApiClient {
         },
         onError: (DioException e, handler) async {
           if (e.response?.statusCode == 401) {
-            await SecureStorageHelper.clearAll();
+            RequestOptions options = e.requestOptions;
 
-            navigatorKey.currentState?.pushAndRemoveUntil(
-              MaterialPageRoute(builder: (context) => const LoginScreen()),
-              (route) => false,
-            );
+            if (options.path.contains('auth/refresh') ||
+                options.path.contains('auth/login')) {
+              await _forceLogout();
+              return handler.next(e);
+            }
+
+            if (_isRefreshing) {
+              _refreshQueue.add((newToken) {
+                options.headers['Authorization'] = 'Bearer $newToken';
+                dio.fetch(options).then(
+                      (response) => handler.resolve(response),
+                      onError: (err) => handler.reject(err),
+                    );
+              });
+              return;
+            }
+
+            _isRefreshing = true;
+            String? refreshToken = await SecureStorageHelper.getRefreshToken();
+
+            if (refreshToken == null) {
+              await _forceLogout();
+              return handler.next(e);
+            }
+
+            try {
+              Dio refreshDio = Dio(BaseOptions(baseUrl: baseUrl));
+              Response response = await refreshDio.post(
+                'api/v1/auth/refresh',
+                data: {'refresh_token': refreshToken},
+                options:
+                    Options(contentType: Headers.formUrlEncodedContentType),
+              );
+
+              if (response.statusCode == 200 &&
+                  response.data['access_token'] != null) {
+                String newAccessToken = response.data['access_token'];
+                await SecureStorageHelper.saveTokens(
+                    access: newAccessToken, refresh: refreshToken);
+
+                options.headers['Authorization'] = 'Bearer $newAccessToken';
+
+                _isRefreshing = false;
+                for (var callback in _refreshQueue) {
+                  callback(newAccessToken);
+                }
+                _refreshQueue.clear();
+
+                Response retryResponse = await dio.fetch(options);
+                return handler.resolve(retryResponse);
+              }
+            } catch (err) {
+              _isRefreshing = false;
+              _refreshQueue.clear();
+              await _forceLogout();
+              return handler.reject(e);
+            }
           }
-
           return handler.next(e);
         },
       ),
+    );
+  }
+
+  Future<void> _forceLogout() async {
+    await SecureStorageHelper.clearAll();
+    navigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      (route) => false,
     );
   }
 }
