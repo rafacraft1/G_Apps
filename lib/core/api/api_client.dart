@@ -7,7 +7,6 @@ class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
   late Dio dio;
 
-  // Hanya mengambil dari .env
   final String baseUrl = dotenv.env['BASE_URL'] ?? '';
 
   factory ApiClient() {
@@ -15,11 +14,6 @@ class ApiClient {
   }
 
   ApiClient._internal() {
-    // Validasi untuk memastikan .env sudah terbaca dengan benar
-    if (baseUrl.isEmpty) {
-      debugPrint('Peringatan: BASE_URL di .env tidak ditemukan atau kosong.');
-    }
-
     dio = Dio(BaseOptions(
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 15),
@@ -45,33 +39,5 @@ class ApiClient {
         },
       ),
     );
-  }
-
-  static Future<Map<String, dynamic>?> getServerData() async {
-    try {
-      final response = await ApiClient().dio.get('/waktu_server');
-
-      if (response.data != null &&
-          (response.data['status'] == 200 ||
-              response.data['status'] == 'success')) {
-        var payload = response.data['data'];
-
-        return {
-          'waktu': DateTime.parse(payload['waktu']),
-          'is_libur': payload['is_libur'] == 1 || payload['is_libur'] == true,
-          'nama_libur': payload['nama_libur'] ?? '',
-          'jam_masuk': payload['jam_masuk'],
-          'jam_pulang': payload['jam_pulang'],
-          'lat_sekolah':
-              double.tryParse(payload['lat_sekolah'].toString()) ?? 0.0,
-          'lon_sekolah':
-              double.tryParse(payload['lon_sekolah'].toString()) ?? 0.0,
-          'radius': double.tryParse(payload['radius'].toString()) ?? 50.0,
-        };
-      }
-    } catch (e) {
-      debugPrint('Gagal ambil data server: $e');
-    }
-    return null;
   }
 }

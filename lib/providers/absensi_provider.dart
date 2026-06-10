@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api/api_client.dart';
 
 class AbsensiProvider with ChangeNotifier {
@@ -11,21 +13,31 @@ class AbsensiProvider with ChangeNotifier {
   bool _isLoadingRiwayat = false;
   bool get isLoadingRiwayat => _isLoadingRiwayat;
 
+  static const String _cacheKey = 'riwayat_absen_cache';
+
   Future<void> fetchRiwayatAbsen() async {
-    _isLoadingRiwayat = true;
-    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+
+    String? cachedData = prefs.getString(_cacheKey);
+    if (cachedData != null) {
+      _listRiwayat = jsonDecode(cachedData);
+      notifyListeners();
+    } else {
+      _isLoadingRiwayat = true;
+      notifyListeners();
+    }
 
     try {
       final response = await ApiClient().dio.get('/absen/riwayat');
 
       if (response.statusCode == 200 && response.data != null) {
         _listRiwayat = response.data['data'] ?? [];
+        await prefs.setString(_cacheKey, jsonEncode(_listRiwayat));
       } else {
-        _listRiwayat = [];
+        if (cachedData == null) _listRiwayat = [];
       }
     } catch (e) {
       debugPrint('Gagal ambil daftar riwayat: $e');
-      _listRiwayat = [];
     } finally {
       _isLoadingRiwayat = false;
       notifyListeners();
@@ -86,7 +98,6 @@ class AbsensiProvider with ChangeNotifier {
         'latitude': lat.toString(),
         'longitude': lon.toString(),
         'is_fake_gps': isMocked ? 1 : 0,
-        // Menggunakan MultipartFile lebih efisien dibanding Base64
         'foto': await MultipartFile.fromFile(finalFile.path,
             filename: 'absen_$tipeAbsen.jpg'),
       });
@@ -112,7 +123,6 @@ class AbsensiProvider with ChangeNotifier {
     } catch (e) {
       throw 'Terjadi kesalahan saat memproses absensi.';
     } finally {
-      // Hapus file sementara agar tidak terjadi penumpukan cache/storage
       if (fileToCleanUp != null && await fileToCleanUp.exists()) {
         await fileToCleanUp.delete();
       }

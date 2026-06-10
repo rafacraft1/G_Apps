@@ -31,6 +31,9 @@ android {
     ndkVersion "25.1.8937393"
 
     compileOptions {
+        // ✅ TAMBAHAN 1: Mengaktifkan fitur desugaring
+        coreLibraryDesugaringEnabled true
+        
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
@@ -61,4 +64,9 @@ android {
 
 flutter {
     source '../..'
+}
+
+// ✅ TAMBAHAN 2: Modul dependency untuk Java 8+ APIs di SDK 21
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
 }

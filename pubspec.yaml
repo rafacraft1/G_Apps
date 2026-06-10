@@ -36,7 +36,9 @@ dependencies:
   workmanager: ^0.7.0
   shared_preferences: ^2.2.3
   
-  # Package dipindahkan ke dependencies utama
+  # ✅ TAMBAHAN BARU: Untuk memunculkan Banner Sistem di Foreground
+  flutter_local_notifications: ^17.1.2
+  
   flutter_native_splash: ^2.4.0 
 
 dev_dependencies:
@@ -51,7 +53,6 @@ flutter:
     - .env
     - assets/animations/
 
-# Konfigurasi Native Splash Screen (Warna disamakan dengan Colors.blue[600])
 flutter_native_splash:
   color: "#1E88E5" 
   android_12:
@@ -63,7 +64,6 @@ flutter_launcher_icons:
   image_path: "assets/images/icon.png"
   min_sdk_android: 21
 
-# MENGATASI DEPENDENCY HELL & VERSION MISMATCH
 dependency_overrides:
   syncfusion_pdfviewer_platform_interface: 24.2.9
   device_info_plus: ^9.1.2

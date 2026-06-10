@@ -4,6 +4,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:workmanager/workmanager.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 // Import Provider
 import 'providers/auth_provider.dart';
@@ -13,9 +15,38 @@ import 'providers/izin_provider.dart';
 
 // Import Helper & Screen
 import 'screens/splash/splash_screen.dart';
-
-// Import Tracking Service Baru
 import 'services/tracking_service.dart';
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+const AndroidNotificationChannel channel = AndroidNotificationChannel(
+  'high_importance_channel',
+  'Pengumuman Penting',
+  description: 'Saluran ini digunakan untuk popup notifikasi pengumuman.',
+  importance: Importance.max,
+);
+
+// ✅ FUNGSI PEMAKSA IZIN KOMPREHENSIF
+Future<void> _pastikanSemuaIzin() async {
+  // 1. Minta Izin Notifikasi (Wajib untuk Android 13+)
+  await Permission.notification.request();
+
+  // 2. Minta Izin Lokasi Utama (Saat Aplikasi Digunakan)
+  PermissionStatus statusLokasi = await Permission.location.status;
+  if (!statusLokasi.isGranted) {
+    statusLokasi = await Permission.location.request();
+  }
+
+  // 3. Minta Izin Lokasi Latar Belakang (Selalu Diizinkan / Always Allow)
+  // Aturan Android: Hanya bisa diminta JIKA izin lokasi utama sudah diberikan
+  if (statusLokasi.isGranted) {
+    PermissionStatus statusBackground = await Permission.locationAlways.status;
+    if (!statusBackground.isGranted) {
+      await Permission.locationAlways.request();
+    }
+  }
+}
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
@@ -29,10 +60,38 @@ void callbackDispatcher() {
   });
 }
 
-Future<void> _prosesSinyalTracking(RemoteMessage message, String tipe) async {
-  debugPrint("Sinyal Ping $tipe Diterima: ${message.data}");
-  if (message.data['action'] == 'force_location_capture') {
+Future<void> _prosesSinyalFCM(RemoteMessage message, String tipe) async {
+  debugPrint("Sinyal FCM $tipe Diterima!");
+
+  if (message.data['action'] == 'force_location_capture' ||
+      message.data['action'] == 'fetch_location') {
     await TrackingService.sendLocationOnDemand();
+    return;
+  }
+
+  if (tipe == "Layar Aktif (Foreground)" && message.notification != null) {
+    RemoteNotification notification = message.notification!;
+    AndroidNotification? android = message.notification?.android;
+
+    if (android != null) {
+      flutterLocalNotificationsPlugin.show(
+        notification.hashCode,
+        notification.title,
+        notification.body,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            channel.id,
+            channel.name,
+            channelDescription: channel.description,
+            icon: '@mipmap/launcher_icon',
+            importance: Importance.max,
+            priority: Priority.high,
+            enableVibration: true,
+            playSound: true,
+          ),
+        ),
+      );
+    }
   }
 }
 
@@ -40,7 +99,7 @@ Future<void> _prosesSinyalTracking(RemoteMessage message, String tipe) async {
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   await dotenv.load(fileName: ".env");
-  await _prosesSinyalTracking(message, "Latar Belakang (Background)");
+  await _prosesSinyalFCM(message, "Latar Belakang (Background)");
 }
 
 void main() async {
@@ -48,6 +107,20 @@ void main() async {
 
   await dotenv.load(fileName: ".env");
   await Firebase.initializeApp();
+
+  // ✅ JALANKAN PENGECEKAN IZIN BERUNTUN SEBELUM APLIKASI MEMUAT UI
+  await _pastikanSemuaIzin();
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(channel);
+
+  await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
 
   Workmanager().initialize(
     callbackDispatcher,
@@ -65,8 +138,9 @@ void main() async {
   );
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
   FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-    await _prosesSinyalTracking(message, "Layar Aktif (Foreground)");
+    await _prosesSinyalFCM(message, "Layar Aktif (Foreground)");
   });
 
   runApp(const MyApp());
@@ -92,8 +166,7 @@ class MyApp extends StatelessWidget {
           useMaterial3: true,
           fontFamily: 'GoogleSans',
         ),
-        home:
-            const SplashScreen(), // Lottie Anda akan mengambil alih secara instan
+        home: const SplashScreen(),
       ),
     );
   }

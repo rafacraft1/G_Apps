@@ -9,6 +9,7 @@ import '../../core/api/api_client.dart';
 import '../../core/utils/secure_storage_helper.dart';
 import '../../providers/pengumuman_provider.dart';
 import '../../providers/absensi_provider.dart';
+import '../../repositories/server_repository.dart';
 
 import '../auth/login_screen.dart';
 import '../absen/camera_screen.dart';
@@ -77,7 +78,6 @@ class _HomeScreenState extends State<HomeScreen> {
       if (fcmToken != null) {
         FormData formData = FormData.fromMap({'fcm_token': fcmToken});
         await ApiClient().dio.post('/fcm/updateToken', data: formData);
-        debugPrint("Sinkronisasi Token FCM Berhasil: $fcmToken");
       }
     } catch (e) {
       debugPrint('Gagal sinkronisasi token FCM: $e');
@@ -105,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      final serverData = await ApiClient.getServerData();
+      final serverData = await ServerRepository.getServerData();
       if (!mounted) return;
 
       if (serverData != null) {
@@ -237,10 +237,8 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                      color: color[50],
-                      shape: BoxShape
-                          .circle), // PERBAIKAN: BoxBoxes -> BoxDecoration
+                  decoration:
+                      BoxDecoration(color: color[50], shape: BoxShape.circle),
                   child: Icon(icon, color: color[700], size: 24),
                 ),
                 const SizedBox(height: 16),
@@ -543,7 +541,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   latSekolah: _latSekolah,
                                   lonSekolah: _lonSekolah,
                                   radius: _radius,
-                                ))); // PERBAIKAN: loop))) -> )));
+                                )));
                     _refreshSemuaData();
                   },
             style: ElevatedButton.styleFrom(
