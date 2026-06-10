@@ -7,18 +7,17 @@ import 'package:workmanager/workmanager.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-// Import Provider
 import 'providers/auth_provider.dart';
 import 'providers/pengumuman_provider.dart';
 import 'providers/absensi_provider.dart';
 import 'providers/izin_provider.dart';
 
-// Import Helper & Screen
 import 'screens/splash/splash_screen.dart';
 import 'services/tracking_service.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
   'high_importance_channel',
@@ -27,19 +26,14 @@ const AndroidNotificationChannel channel = AndroidNotificationChannel(
   importance: Importance.max,
 );
 
-// ✅ FUNGSI PEMAKSA IZIN KOMPREHENSIF
 Future<void> _pastikanSemuaIzin() async {
-  // 1. Minta Izin Notifikasi (Wajib untuk Android 13+)
   await Permission.notification.request();
 
-  // 2. Minta Izin Lokasi Utama (Saat Aplikasi Digunakan)
   PermissionStatus statusLokasi = await Permission.location.status;
   if (!statusLokasi.isGranted) {
     statusLokasi = await Permission.location.request();
   }
 
-  // 3. Minta Izin Lokasi Latar Belakang (Selalu Diizinkan / Always Allow)
-  // Aturan Android: Hanya bisa diminta JIKA izin lokasi utama sudah diberikan
   if (statusLokasi.isGranted) {
     PermissionStatus statusBackground = await Permission.locationAlways.status;
     if (!statusBackground.isGranted) {
@@ -61,8 +55,6 @@ void callbackDispatcher() {
 }
 
 Future<void> _prosesSinyalFCM(RemoteMessage message, String tipe) async {
-  debugPrint("Sinyal FCM $tipe Diterima!");
-
   if (message.data['action'] == 'force_location_capture' ||
       message.data['action'] == 'fetch_location') {
     await TrackingService.sendLocationOnDemand();
@@ -108,7 +100,6 @@ void main() async {
   await dotenv.load(fileName: ".env");
   await Firebase.initializeApp();
 
-  // ✅ JALANKAN PENGECEKAN IZIN BERUNTUN SEBELUM APLIKASI MEMUAT UI
   await _pastikanSemuaIzin();
 
   await flutterLocalNotificationsPlugin
@@ -160,6 +151,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'Sistem Absensi Geofence',
+        navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),

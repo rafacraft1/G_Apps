@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../utils/secure_storage_helper.dart';
+import '../../main.dart';
+import '../../screens/auth/login_screen.dart';
 
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
@@ -33,8 +35,16 @@ class ApiClient {
           }
           return handler.next(options);
         },
-        onError: (DioException e, handler) {
-          debugPrint('API Error: ${e.response?.statusCode} - ${e.message}');
+        onError: (DioException e, handler) async {
+          if (e.response?.statusCode == 401) {
+            await SecureStorageHelper.clearAll();
+
+            navigatorKey.currentState?.pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
+              (route) => false,
+            );
+          }
+
           return handler.next(e);
         },
       ),
