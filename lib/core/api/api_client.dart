@@ -15,12 +15,10 @@ class ApiClient {
 
   final String baseUrl = dotenv.env['BASE_URL'] ?? '';
 
-  /// Factory constructor untuk mengembalikan instance singleton
   factory ApiClient() {
     return _instance;
   }
 
-  /// Internal constructor untuk inisialisasi Dio dan Interceptor
   ApiClient._internal() {
     dio = Dio(BaseOptions(
       baseUrl: baseUrl,
@@ -110,7 +108,6 @@ class ApiClient {
     );
   }
 
-  /// Memaksa pengguna keluar dari sesi jika token gagal diperbarui
   Future<void> _forceLogout() async {
     await SecureStorageHelper.clearAll();
     navigatorKey.currentState?.pushAndRemoveUntil(

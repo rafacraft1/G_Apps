@@ -43,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _jamMasukServer = "07:00:00";
   String _jamPulangServer = "15:00:00";
+  String _jamBukaServer = "06:00:00";
   double _latSekolah = 0.0;
   double _lonSekolah = 0.0;
   double _radius = 50.0;
@@ -117,6 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           _jamMasukServer = serverData['jam_masuk'] ?? "07:00:00";
           _jamPulangServer = serverData['jam_pulang'] ?? "15:00:00";
+          _jamBukaServer = serverData['pengaturan']['jam_buka'] ?? "06:00:00";
 
           _latSekolah =
               double.tryParse(serverData['lat_sekolah']?.toString() ?? '0.0') ??
