@@ -10,16 +10,27 @@ class AuthProvider with ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
-  /// Mengambil Device ID berdasarkan platform OS
+  /// Mengambil kombinasi Merek, Tipe, Versi OS, dan Secure ID pengganti IMEI
   Future<String> _getDeviceId() async {
     final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
     try {
       if (Platform.isAndroid) {
         AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-        return "${androidInfo.id}-${androidInfo.model}".replaceAll(' ', '_');
+        String brand = androidInfo.brand;
+        String model = androidInfo.model;
+        String osVersion = androidInfo.version.release;
+        String androidId = androidInfo.id;
+
+        return "${brand}_${model}_Android-${osVersion}_$androidId"
+            .replaceAll(' ', '_');
       } else if (Platform.isIOS) {
         IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
-        return iosInfo.identifierForVendor ?? 'unknown_ios_device';
+        String brand = 'Apple';
+        String model = iosInfo.model;
+        String osVersion = iosInfo.systemVersion;
+        String idfv = iosInfo.identifierForVendor ?? 'unknown_id';
+
+        return "${brand}_${model}_iOS-${osVersion}_$idfv".replaceAll(' ', '_');
       }
     } catch (e) {
       debugPrint('Gagal mendapatkan Device ID: $e');
@@ -36,7 +47,7 @@ class AuthProvider with ChangeNotifier {
       String? boundUser = await SecureStorageHelper.getBoundUser();
 
       if (boundUser != null && boundUser.isNotEmpty && boundUser != nis) {
-        throw 'HP ini telah dikunci untuk NIS ($boundUser). Anda tidak diizinkan login menggunakan perangkat ini!';
+        throw 'Perangkat ini telah terkunci untuk NIS ($boundUser). Hubungi Wali Kelas untuk melakukan Reset Device.';
       }
 
       String deviceId = await _getDeviceId();
@@ -56,44 +67,22 @@ class AuthProvider with ChangeNotifier {
       });
 
       final response = await ApiClient().dio.post(
-            '/auth/login',
+            'auth/login',
             data: formData,
           );
 
-      bool isSuccess = response.statusCode == 200;
-      if (!isSuccess && response.data is Map) {
-        isSuccess = response.data['status'] == 200;
-      }
-
-      if (isSuccess) {
-        if (response.data is! Map) {
-          throw 'Format respon dari server tidak valid (bukan JSON).';
-        }
-
+      if (response.statusCode == 200 && response.data != null) {
         String accessToken = response.data['access_token'] ?? '';
         String refreshToken = response.data['refresh_token'] ?? '';
         var responseData = response.data['data'] ?? {};
 
-        String idSiswa = responseData['id_siswa']?.toString() ??
-            responseData['id']?.toString() ??
-            '';
+        String idSiswa = responseData['id_siswa']?.toString() ?? '';
+        String nama = responseData['nama_siswa'] ?? 'Siswa';
+        String foto = responseData['foto_profil'] ?? '';
+        String kelas = responseData['nama_kelas'] ?? 'Siswa Aktif';
 
-        String nama = responseData['nama_siswa'] ??
-            responseData['nama_lengkap'] ??
-            'Siswa';
-
-        String foto = responseData['foto_profil'] ?? responseData['foto'] ?? '';
-
-        String kelas = responseData['nama_kelas'] ??
-            responseData['kelas'] ??
-            'Siswa Aktif';
-
-        if (accessToken.isEmpty || refreshToken.isEmpty) {
-          throw 'Server tidak mengembalikan token keamanan.';
-        }
-
-        if (idSiswa.isEmpty) {
-          throw 'Server tidak mengembalikan ID Siswa.';
+        if (accessToken.isEmpty || refreshToken.isEmpty || idSiswa.isEmpty) {
+          throw 'Server mengembalikan data yang tidak lengkap.';
         }
 
         await SecureStorageHelper.saveTokens(
@@ -111,18 +100,11 @@ class AuthProvider with ChangeNotifier {
 
         return true;
       } else {
-        if (response.data is Map) {
-          throw response.data['message'] ?? 'Login gagal';
-        } else {
-          throw 'Terjadi kesalahan sistem di server. Silakan hubungi admin.';
-        }
+        throw 'Terjadi kesalahan sistem di server. Silakan hubungi admin.';
       }
     } on DioException catch (e) {
       if (e.response?.data != null && e.response?.data is Map) {
-        if (e.response?.data['messages'] != null) {
-          throw e.response?.data['messages']['error'] ?? 'Gagal login';
-        }
-        throw e.response?.data['message'] ?? 'Gagal menghubungi server.';
+        throw e.response?.data['message'] ?? 'Gagal login, periksa NIS Anda.';
       }
       throw 'Gagal menghubungi server atau jaringan terputus.';
     } catch (e) {
@@ -133,7 +115,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Memproses unggah foto profil
+  /// Memproses unggah foto profil ke server
   Future<String> uploadFotoProfil(File fileFoto) async {
     try {
       String? token = await SecureStorageHelper.getToken();
@@ -151,7 +133,7 @@ class AuthProvider with ChangeNotifier {
       });
 
       final response = await ApiClient().dio.post(
-            '/profile/upload-foto',
+            'profile/upload-foto',
             data: formData,
             options: Options(
               headers: {
@@ -160,21 +142,16 @@ class AuthProvider with ChangeNotifier {
             ),
           );
 
-      if (response.statusCode == 200) {
-        if (response.data is! Map) throw 'Format data tidak valid.';
-
+      if (response.statusCode == 200 && response.data != null) {
         String namaFoto = response.data['foto_profil'] ?? '';
 
         if (namaFoto.isEmpty) {
-          throw 'Server tidak mengembalikan nama foto.';
+          throw 'Server gagal memproses foto.';
         }
 
         await SecureStorageHelper.setFotoProfile(namaFoto);
         return namaFoto;
       } else {
-        if (response.data is Map) {
-          throw response.data['message'] ?? 'Gagal mengunggah foto.';
-        }
         throw 'Gagal mengunggah foto karena kesalahan server.';
       }
     } on DioException catch (e) {
@@ -187,34 +164,13 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Memproses pengajuan reset device
-  Future<bool> ajukanResetDevice(String alasan) async {
+  /// Membersihkan sesi perangkat secara lokal
+  Future<bool> resetDeviceLokal() async {
     try {
-      String? token = await SecureStorageHelper.getToken();
-
-      if (token == null) {
-        throw 'Sesi Anda telah habis. Silakan login ulang.';
-      }
-
-      FormData formData = FormData.fromMap({'alasan': alasan});
-
-      final response = await ApiClient().dio.post(
-            '/auth/resetDevice',
-            data: formData,
-          );
-
-      if (response.statusCode == 200) {
-        await SecureStorageHelper.clearDeviceBinding();
-        return true;
-      }
-      return false;
-    } on DioException catch (e) {
-      if (e.response?.data is Map) {
-        throw e.response?.data['message'] ?? 'Gagal mengajukan reset device.';
-      }
-      throw 'Terjadi kesalahan sistem pada server.';
+      await SecureStorageHelper.clearAll();
+      return true;
     } catch (e) {
-      throw 'Terjadi kesalahan sistem.';
+      throw 'Gagal membersihkan cache perangkat lokal.';
     }
   }
 }

@@ -8,7 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../core/utils/secure_storage_helper.dart';
 
 import '../auth/login_screen.dart';
-import '../izin/riwayat_izin_screen.dart'; // Import layar riwayat izin
+import '../izin/riwayat_izin_screen.dart';
 import 'widgets/profile_card.dart';
 import 'widgets/security_menu.dart';
 
@@ -21,8 +21,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   String _namaSiswa = 'Memuat...';
-  String _namaKelas =
-      'Siswa Aktif'; // PENAMBAHAN: State untuk menampung nama kelas
+  String _namaKelas = 'Siswa Aktif';
   String? _fotoUrl;
   bool _isUploadingFoto = false;
 
@@ -37,15 +36,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _loadData() async {
     final nama = await SecureStorageHelper.getUserName();
     final foto = await SecureStorageHelper.getFotoProfile();
-    final kelas = await SecureStorageHelper
-        .getUserKelas(); // PENAMBAHAN: Ambil data kelas dari storage
+    final kelas = await SecureStorageHelper.getUserKelas();
 
     if (!mounted) return;
 
     setState(() {
       _namaSiswa = nama ?? 'Siswa';
       _fotoUrl = foto;
-      _namaKelas = kelas ?? 'Siswa Aktif'; // PENAMBAHAN: Set state kelas
+      _namaKelas = kelas ?? 'Siswa Aktif';
     });
   }
 
@@ -100,53 +98,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _ajukanReset() {
-    final TextEditingController alasanController = TextEditingController();
-
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Reset Penguncian HP?',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+        title: const Row(
           children: [
-            const Text(
-              'Fitur ini digunakan jika Anda berganti HP. Admin akan mereview permohonan Anda sebelum disetujui.',
-              style: TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: alasanController,
-              decoration: InputDecoration(
-                labelText: 'Alasan Ganti HP',
-                hintText: 'Contoh: HP lama rusak',
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              maxLines: 2,
+            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text('Reset Perangkat',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             ),
           ],
+        ),
+        content: const Text(
+          'Tindakan ini akan menghapus sesi lokal Anda. Untuk dapat login di HP baru, Anda WAJIB melapor ke Wali Kelas atau Admin agar kunci perangkat (Device ID) Anda direset dari server sekolah.',
+          style: TextStyle(fontSize: 14, height: 1.5),
+          textAlign: TextAlign.justify,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Batal'),
+            child: const Text('Batal',
+                style:
+                    TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             onPressed: () async {
-              final alasan = alasanController.text.trim();
-              if (alasan.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Alasan wajib diisi!')),
-                );
-                return;
-              }
-
               final authProvider =
                   Provider.of<AuthProvider>(context, listen: false);
 
               Navigator.pop(dialogContext);
+
               showDialog(
                 context: context,
                 barrierDismissible: false,
@@ -155,27 +139,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
               );
 
               try {
-                final sukses = await authProvider.ajukanResetDevice(alasan);
+                await authProvider.resetDeviceLokal();
 
                 if (!mounted) return;
                 Navigator.pop(context);
 
-                if (sukses) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text(
-                            'Pengajuan berhasil dikirim! Silakan hubungi admin.'),
-                        backgroundColor: Colors.green),
-                  );
-                  await SecureStorageHelper.clearAll();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Sesi perangkat berhasil dibersihkan.'),
+                      backgroundColor: Colors.green),
+                );
 
-                  if (!mounted) return;
-                  Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const LoginScreen()),
-                      (route) => false);
-                }
+                Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const LoginScreen()),
+                    (route) => false);
               } catch (e) {
                 if (!mounted) return;
                 Navigator.pop(context);
@@ -187,8 +166,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             },
             style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange[600],
-                foregroundColor: Colors.white),
-            child: const Text('Kirim Pengajuan'),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10))),
+            child: const Text('Bersihkan & Keluar'),
           ),
         ],
       ),
@@ -249,16 +230,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         children: [
                           ProfileCard(
                             namaSiswa: _namaSiswa,
-                            namaKelas:
-                                _namaKelas, // PENAMBAHAN: Lempar parameter nama kelas ke widget ProfileCard
+                            namaKelas: _namaKelas,
                             fotoUrl: _fotoUrl,
                             isUploading: _isUploadingFoto,
                             onUploadTap: _pilihDanUploadFoto,
                             getValidUrl: _getValidFotoUrl,
                           ),
                           const SizedBox(height: 32),
-
-                          // --- TAMBAHAN: MENU PERIZINAN ---
                           const Text(
                             'Kehadiran & Izin',
                             style: TextStyle(
@@ -276,8 +254,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     builder: (_) => const RiwayatIzinScreen())),
                           ),
                           const SizedBox(height: 32),
-                          // -------------------------------
-
                           SecurityMenu(onResetTap: _ajukanReset),
                           const SizedBox(height: 40),
                         ],
@@ -293,7 +269,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Helper widget untuk menu item agar kode tetap bersih (Clean Code)
   Widget _buildMenuItem({
     required IconData icon,
     required String title,

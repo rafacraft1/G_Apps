@@ -77,7 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
       String? fcmToken = await FirebaseMessaging.instance.getToken();
       if (fcmToken != null) {
         FormData formData = FormData.fromMap({'fcm_token': fcmToken});
-        await ApiClient().dio.post('/fcm/updateToken', data: formData);
+        await ApiClient().dio.post('fcm/updateToken', data: formData);
       }
     } catch (e) {
       debugPrint('Gagal sinkronisasi token FCM: $e');

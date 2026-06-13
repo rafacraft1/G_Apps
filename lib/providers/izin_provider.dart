@@ -60,7 +60,7 @@ class IzinProvider with ChangeNotifier {
       });
 
       final response = await ApiClient().dio.post(
-            '/izin/ajukan',
+            'izin/ajukan',
             data: formData,
           );
 
@@ -94,7 +94,7 @@ class IzinProvider with ChangeNotifier {
     }
   }
 
-  /// Mengambil riwayat izin menggunakan sistem Caching (Offline First)
+  /// Mengambil riwayat izin menggunakan sistem Caching
   Future<void> fetchRiwayatIzin({bool forceRefresh = false}) async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -107,7 +107,7 @@ class IzinProvider with ChangeNotifier {
     }
 
     try {
-      final response = await ApiClient().dio.get('/izin/riwayat');
+      final response = await ApiClient().dio.get('izin/riwayat');
       if (response.statusCode == 200 && response.data != null) {
         _listRiwayat = response.data['data'] ?? [];
         await prefs.setString(_cacheKey, jsonEncode(_listRiwayat));

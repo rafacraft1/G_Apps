@@ -26,7 +26,7 @@ class PengumumanProvider with ChangeNotifier {
     }
 
     try {
-      final response = await ApiClient().dio.get('/pengumuman');
+      final response = await ApiClient().dio.get('pengumuman');
 
       if (response.statusCode == 200 && response.data != null) {
         if (response.data['status'] == 200 ||

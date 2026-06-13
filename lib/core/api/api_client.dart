@@ -5,18 +5,22 @@ import '../utils/secure_storage_helper.dart';
 import '../../main.dart';
 import '../../screens/auth/login_screen.dart';
 
+/// Singleton class untuk manajemen koneksi API HTTP menggunakan Dio
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
+
   late Dio dio;
   bool _isRefreshing = false;
   final List<void Function(String)> _refreshQueue = [];
 
   final String baseUrl = dotenv.env['BASE_URL'] ?? '';
 
+  /// Factory constructor untuk mengembalikan instance singleton
   factory ApiClient() {
     return _instance;
   }
 
+  /// Internal constructor untuk inisialisasi Dio dan Interceptor
   ApiClient._internal() {
     dio = Dio(BaseOptions(
       baseUrl: baseUrl,
@@ -67,8 +71,9 @@ class ApiClient {
 
             try {
               Dio refreshDio = Dio(BaseOptions(baseUrl: baseUrl));
+
               Response response = await refreshDio.post(
-                'api/v1/auth/refresh',
+                'auth/refresh',
                 data: {'refresh_token': refreshToken},
                 options:
                     Options(contentType: Headers.formUrlEncodedContentType),
@@ -77,6 +82,7 @@ class ApiClient {
               if (response.statusCode == 200 &&
                   response.data['access_token'] != null) {
                 String newAccessToken = response.data['access_token'];
+
                 await SecureStorageHelper.saveTokens(
                     access: newAccessToken, refresh: refreshToken);
 
@@ -104,6 +110,7 @@ class ApiClient {
     );
   }
 
+  /// Memaksa pengguna keluar dari sesi jika token gagal diperbarui
   Future<void> _forceLogout() async {
     await SecureStorageHelper.clearAll();
     navigatorKey.currentState?.pushAndRemoveUntil(

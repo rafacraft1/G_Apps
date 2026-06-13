@@ -56,7 +56,7 @@ class SecurityMenu extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Reset Penguncian HP',
+                            'Reset Perangkat Lokal',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -65,7 +65,7 @@ class SecurityMenu extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Ajukan jika Anda ganti HP baru',
+                            'Bersihkan sesi jika ingin ganti HP',
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.grey[500],
