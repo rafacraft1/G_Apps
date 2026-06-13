@@ -120,7 +120,7 @@ class TrackingService {
       if (queue.isEmpty) return;
 
       final response = await ApiClient().dio.post(
-        '/tracking/store',
+        'tracking/store',
         data: {'locations': queue},
       );
 
@@ -154,7 +154,7 @@ class TrackingService {
       List<Map<String, dynamic>> finalLocations = [...queue, currentLoc];
 
       await ApiClient().dio.post(
-        '/tracking/store',
+        'tracking/store',
         data: {'locations': finalLocations},
       );
 

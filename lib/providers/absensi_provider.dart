@@ -29,7 +29,7 @@ class AbsensiProvider with ChangeNotifier {
     }
 
     try {
-      final response = await ApiClient().dio.get('/absen/riwayat');
+      final response = await ApiClient().dio.get('absen/riwayat');
 
       if (response.statusCode == 200 && response.data != null) {
         _listRiwayat = response.data['data'] ?? [];
@@ -45,7 +45,7 @@ class AbsensiProvider with ChangeNotifier {
     }
   }
 
-  /// Mengecek status absensi hari ini menggunakan state memori (tanpa memanggil API kembali)
+  /// Mengecek status absensi hari ini menggunakan state memori
   Future<Map<String, dynamic>?> cekAbsenHariIni(String tanggal) async {
     if (_listRiwayat.isEmpty) {
       await fetchRiwayatAbsen();
@@ -97,7 +97,7 @@ class AbsensiProvider with ChangeNotifier {
       });
 
       final response = await ApiClient().dio.post(
-            '/absen/$tipeAbsen',
+            'absen/$tipeAbsen',
             data: formData,
           );
 
