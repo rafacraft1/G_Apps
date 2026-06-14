@@ -44,7 +44,6 @@ class CameraMlHelper {
       final Plane uPlane = image.planes[1];
       final Plane vPlane = image.planes[2];
 
-      final int uvRowStride = uPlane.bytesPerRow;
       final int uvPixelStride = uPlane.bytesPerPixel ?? 1;
 
       // Konversi presisi agar sesuai dengan NV21:
