@@ -15,7 +15,6 @@ class AbsensiProvider with ChangeNotifier {
 
   static const String _cacheKey = 'riwayat_absen_cache';
 
-  /// Mengambil riwayat absensi dari API dan menyimpan ke memori lokal
   Future<void> fetchRiwayatAbsen() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -45,7 +44,6 @@ class AbsensiProvider with ChangeNotifier {
     }
   }
 
-  /// Mengecek status absensi hari ini menggunakan state memori
   Future<Map<String, dynamic>?> cekAbsenHariIni(String tanggal) async {
     if (_listRiwayat.isEmpty) {
       await fetchRiwayatAbsen();
@@ -60,12 +58,13 @@ class AbsensiProvider with ChangeNotifier {
     return null;
   }
 
-  /// Mengirim data presensi masuk dan pulang
   Future<bool> kirimAbsen({
     required File foto,
     required double lat,
     required double lon,
     required bool isMocked,
+    required double accuracy,
+    required int deviceTimestamp,
     required String tipeAbsen,
   }) async {
     File? fileToCleanUp;
@@ -85,13 +84,14 @@ class AbsensiProvider with ChangeNotifier {
 
       File finalFile =
           compressedFile != null ? File(compressedFile.path) : foto;
-
       if (compressedFile != null) fileToCleanUp = finalFile;
 
       FormData formData = FormData.fromMap({
         'latitude': lat.toString(),
         'longitude': lon.toString(),
-        'is_fake_gps': isMocked ? 1 : 0,
+        'is_mock': isMocked ? 1 : 0,
+        'accuracy': accuracy.toString(),
+        'device_timestamp': deviceTimestamp.toString(),
         'foto': await MultipartFile.fromFile(finalFile.path,
             filename: 'absen_$tipeAbsen.jpg'),
       });

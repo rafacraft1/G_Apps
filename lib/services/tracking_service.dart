@@ -1,31 +1,48 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../core/api/api_client.dart';
 
 class TrackingService {
-  static const String _queueKey = 'location_queue';
+  /// Mendapatkan Device ID secara independen untuk Background Service
+  static Future<String> _getDeviceId() async {
+    final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+    try {
+      if (Platform.isAndroid) {
+        AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+        return "${androidInfo.brand}_${androidInfo.model}_Android-${androidInfo.version.release}_${androidInfo.id}"
+            .replaceAll(' ', '_');
+      } else if (Platform.isIOS) {
+        IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
+        return "Apple_${iosInfo.model}_iOS-${iosInfo.systemVersion}_${iosInfo.identifierForVendor ?? 'unknown_id'}"
+            .replaceAll(' ', '_');
+      }
+    } catch (e) {
+      debugPrint('Tracking Device ID Error: $e');
+    }
+    return 'unknown_device';
+  }
 
   static Future<void> initializeService() async {
     final service = FlutterBackgroundService();
-
     await service.configure(
       androidConfiguration: AndroidConfiguration(
         onStart: onStart,
-        autoStart: false,
+        autoStart: true,
         isForegroundMode: true,
         notificationChannelId: 'tracking_channel',
-        initialNotificationTitle: 'Geofence Tracking Aktif',
-        initialNotificationContent: 'Memantau lokasi perangkat',
+        initialNotificationTitle: 'Geofence System Standby',
+        initialNotificationContent:
+            'Aplikasi siap menerima instruksi sinkronisasi.',
         foregroundServiceNotificationId: 888,
       ),
       iosConfiguration: IosConfiguration(
-        autoStart: false,
+        autoStart: true,
         onForeground: onStart,
         onBackground: onIosBackground,
       ),
@@ -64,20 +81,19 @@ class TrackingService {
       service.on('stopService').listen((event) {
         service.stopSelf();
       });
+
+      // Listener opsional jika dipicu dari interaksi UI di Foreground
+      service.on('triggerLocation').listen((event) async {
+        await sendLocationOnDemand();
+      });
     }
 
-    Timer.periodic(const Duration(minutes: 5), (timer) async {
-      if (service is AndroidServiceInstance) {
-        if (await service.isForegroundService()) {
-          await saveLocationPeriodic();
-        }
-      } else {
-        await saveLocationPeriodic();
-      }
-    });
+    // PENGIRIMAN OTOMATIS BERKALA DIHAPUS.
+    // Service hanya diam (standby) menjaga akses lokasi OS agar tidak diputus.
   }
 
-  static Future<void> saveLocationPeriodic() async {
+  /// Fungsi ini HANYA dipanggil saat menerima perintah FCM dari Admin
+  static Future<void> sendLocationOnDemand() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) return;
@@ -88,77 +104,26 @@ class TrackingService {
 
       Position pos = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
-      SharedPreferences prefs = await SharedPreferences.getInstance();
 
-      List<String> queueStr = prefs.getStringList(_queueKey) ?? [];
-      List<Map<String, dynamic>> queue =
-          queueStr.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
-
-      queue.add({
-        'lat': pos.latitude,
-        'lng': pos.longitude,
-        'waktu': DateTime.now().toLocal().toString().split('.')[0],
-        'tipe': 'berkala'
-      });
-
-      if (queue.length > 10) {
-        queue = queue.sublist(queue.length - 10);
-      }
-
-      await prefs.setStringList(
-          _queueKey, queue.map((e) => jsonEncode(e)).toList());
-
-      await _syncLocationToServer(queue, prefs);
-    } catch (e) {
-      debugPrint(e.toString());
-    }
-  }
-
-  static Future<void> _syncLocationToServer(
-      List<Map<String, dynamic>> queue, SharedPreferences prefs) async {
-    try {
-      if (queue.isEmpty) return;
-
-      final response = await ApiClient().dio.post(
-        'tracking/store',
-        data: {'locations': queue},
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        await prefs.setStringList(_queueKey, []);
-      }
-    } catch (e) {
-      debugPrint(e.toString());
-    }
-  }
-
-  static Future<void> sendLocationOnDemand() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return;
-
-      Position pos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
       Map<String, dynamic> currentLoc = {
         'lat': pos.latitude,
         'lng': pos.longitude,
+        'accuracy': pos.accuracy,
+        'is_mock': pos.isMocked ? 1 : 0,
         'waktu': DateTime.now().toLocal().toString().split('.')[0],
         'tipe': 'trigger'
       };
 
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      List<String> queueStr = prefs.getStringList(_queueKey) ?? [];
-      List<Map<String, dynamic>> queue =
-          queueStr.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+      String deviceId = await _getDeviceId();
 
-      List<Map<String, dynamic>> finalLocations = [...queue, currentLoc];
-
+      // Langsung kirim 1 data aktual tanpa sistem antrean (queue)
       await ApiClient().dio.post(
         'tracking/store',
-        data: {'locations': finalLocations},
+        data: {
+          'device_id': deviceId,
+          'locations': [currentLoc]
+        },
       );
-
-      await prefs.setStringList(_queueKey, []);
     } catch (e) {
       debugPrint(e.toString());
     }

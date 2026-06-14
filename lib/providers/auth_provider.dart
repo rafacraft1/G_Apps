@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../core/api/api_client.dart';
 import '../core/utils/secure_storage_helper.dart';
+import '../services/tracking_service.dart';
 
 class AuthProvider with ChangeNotifier {
   bool _isLoading = false;
@@ -16,21 +17,12 @@ class AuthProvider with ChangeNotifier {
     try {
       if (Platform.isAndroid) {
         AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-        String brand = androidInfo.brand;
-        String model = androidInfo.model;
-        String osVersion = androidInfo.version.release;
-        String androidId = androidInfo.id;
-
-        return "${brand}_${model}_Android-${osVersion}_$androidId"
+        return "${androidInfo.brand}_${androidInfo.model}_Android-${androidInfo.version.release}_${androidInfo.id}"
             .replaceAll(' ', '_');
       } else if (Platform.isIOS) {
         IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
-        String brand = 'Apple';
-        String model = iosInfo.model;
-        String osVersion = iosInfo.systemVersion;
-        String idfv = iosInfo.identifierForVendor ?? 'unknown_id';
-
-        return "${brand}_${model}_iOS-${osVersion}_$idfv".replaceAll(' ', '_');
+        return "Apple_${iosInfo.model}_iOS-${iosInfo.systemVersion}_${iosInfo.identifierForVendor ?? 'unknown_id'}"
+            .replaceAll(' ', '_');
       }
     } catch (e) {
       debugPrint('Gagal mendapatkan Device ID: $e');
@@ -46,6 +38,7 @@ class AuthProvider with ChangeNotifier {
     try {
       String? boundUser = await SecureStorageHelper.getBoundUser();
 
+      // Cek apakah HP ini sudah pernah dipakai oleh NIS lain
       if (boundUser != null && boundUser.isNotEmpty && boundUser != nis) {
         throw 'Perangkat ini telah terkunci untuk NIS ($boundUser). Hubungi Wali Kelas untuk melakukan Reset Device.';
       }
@@ -61,7 +54,8 @@ class AuthProvider with ChangeNotifier {
 
       FormData formData = FormData.fromMap({
         'nis': nis,
-        'password': nis,
+        'password':
+            nis, // Default password menggunakan NIS (bisa disesuaikan nanti)
         'device_id': deviceId,
         'fcm_token': fcmToken ?? '',
       });
@@ -85,6 +79,7 @@ class AuthProvider with ChangeNotifier {
           throw 'Server mengembalikan data yang tidak lengkap.';
         }
 
+        // Simpan data sesi ke lokal
         await SecureStorageHelper.saveTokens(
             access: accessToken, refresh: refreshToken);
         await SecureStorageHelper.saveUserId(idSiswa);
@@ -96,7 +91,12 @@ class AuthProvider with ChangeNotifier {
           await SecureStorageHelper.setFotoProfile(foto);
         }
 
+        // Kunci HP ini secara permanen untuk NIS yang berhasil login
         await SecureStorageHelper.setBoundUser(nis);
+
+        // Pastikan service Background berjalan saat login sukses
+        await TrackingService.initializeService();
+        await TrackingService.startTracking();
 
         return true;
       } else {
@@ -109,6 +109,42 @@ class AuthProvider with ChangeNotifier {
       throw 'Gagal menghubungi server atau jaringan terputus.';
     } catch (e) {
       throw e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Proses Logout yang terintegrasi (Hitamkan Token & Pertahankan Kunci Perangkat)
+  Future<bool> logout() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      // 1. Beritahu server untuk memasukkan Token ke daftar Blacklist
+      try {
+        await ApiClient().dio.post('auth/logout');
+      } catch (e) {
+        debugPrint('Logout server gagal / token kedaluwarsa. Abaikan.');
+      }
+
+      // 2. Simpan sementara data pengunci HP (NIS) sebelum memori dibersihkan
+      String? boundUser = await SecureStorageHelper.getBoundUser();
+
+      // 3. Bersihkan memori sesi lokal
+      await SecureStorageHelper.clearAll();
+
+      // 4. Kembalikan PENGUNCI HP agar siswa lain tetap tidak bisa login di HP ini
+      if (boundUser != null) {
+        await SecureStorageHelper.setBoundUser(boundUser);
+      }
+
+      // CATATAN: KITA TIDAK MEMATIKAN TRACKING SERVICE DI SINI!
+      // Agar fitur lacak lokasi On-Demand dari Admin tetap bisa berjalan meskipun siswa logout.
+
+      return true;
+    } catch (e) {
+      throw 'Terjadi kesalahan saat logout.';
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -164,10 +200,12 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Membersihkan sesi perangkat secara lokal
+  /// Membersihkan seluruh data (Digunakan khusus jika perangkat di-Reset Admin)
   Future<bool> resetDeviceLokal() async {
     try {
-      await SecureStorageHelper.clearAll();
+      await TrackingService.stopTracking(); // Matikan total tracking
+      await SecureStorageHelper
+          .clearAll(); // Bersihkan semua memori termasuk pengunci
       return true;
     } catch (e) {
       throw 'Gagal membersihkan cache perangkat lokal.';

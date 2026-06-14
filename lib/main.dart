@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:workmanager/workmanager.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -42,25 +41,19 @@ Future<void> _pastikanSemuaIzin() async {
   }
 }
 
-@pragma('vm:entry-point')
-void callbackDispatcher() {
-  Workmanager().executeTask((task, inputData) async {
-    if (task == 'periodic_tracking') {
-      WidgetsFlutterBinding.ensureInitialized();
-      await dotenv.load(fileName: ".env");
-      await TrackingService.saveLocationPeriodic();
-    }
-    return Future.value(true);
-  });
-}
-
 Future<void> _prosesSinyalFCM(RemoteMessage message, String tipe) async {
-  if (message.data['action'] == 'force_location_capture' ||
+  // 1. Menangkap Sinyal Live Tracking On-Demand (Silent Push dari Backend)
+  if (message.data['type'] == 'trigger_tracking' ||
+      message.data['action'] == 'force_location_capture' ||
       message.data['action'] == 'fetch_location') {
+    // Bangunkan fungsi lacak, kirim lokasi ke server secara instan
     await TrackingService.sendLocationOnDemand();
+
+    // Return agar tidak memunculkan notifikasi UI yang mengganggu siswa
     return;
   }
 
+  // 2. Menangkap Sinyal Pengumuman / Notifikasi Biasa
   if (tipe == "Layar Aktif (Foreground)" && message.notification != null) {
     RemoteNotification notification = message.notification!;
     AndroidNotification? android = message.notification?.android;
@@ -113,26 +106,16 @@ void main() async {
     sound: true,
   );
 
-  Workmanager().initialize(
-    callbackDispatcher,
-    isInDebugMode: false,
-  );
-
-  Workmanager().registerPeriodicTask(
-    "tracking_15m_task",
-    "periodic_tracking",
-    frequency: const Duration(minutes: 15),
-    constraints: Constraints(
-      networkType: NetworkType.not_required,
-      requiresDeviceIdle: false,
-    ),
-  );
-
+  // Mendaftarkan Handler Notifikasi FCM (Background & Terminated)
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
+  // Mendaftarkan Handler Notifikasi FCM (Foreground)
   FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
     await _prosesSinyalFCM(message, "Layar Aktif (Foreground)");
   });
+
+  // Inisialisasi Service Background agar standby menerima sinyal OS
+  await TrackingService.initializeService();
 
   runApp(const MyApp());
 }

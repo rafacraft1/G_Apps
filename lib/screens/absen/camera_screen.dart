@@ -7,7 +7,7 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
 import '../../core/utils/location_helper.dart';
-import '../../core/utils/camera_ml_helper.dart'; // Helper Anda kita panggil di sini
+import '../../core/utils/camera_ml_helper.dart';
 import '../../providers/absensi_provider.dart';
 import '../../core/utils/secure_storage_helper.dart';
 import '../auth/login_screen.dart';
@@ -39,12 +39,10 @@ class _CameraScreenState extends State<CameraScreen>
   Position? _posisi;
   bool _isFakeGpsDetected = false;
 
-  // ML Kit Live Tracking State
   FaceDetector? _faceDetector;
   bool _isDetecting = false;
   bool _isFaceLiveDetected = false;
 
-  // Status UI
   String _statusLoading = "Mencari Satelit GPS...";
   String _statusPesan = "Arahkan wajah Anda ke kamera";
   bool _isProcessingPhoto = false;
@@ -59,7 +57,6 @@ class _CameraScreenState extends State<CameraScreen>
     isDispensasi = widget.tipeAbsen.contains('dispensasi');
     isMasuk = widget.tipeAbsen.contains('masuk');
 
-    // Karena kita pakai Live Stream, ubah mode ke Fast agar tidak lag di HP kentang
     _faceDetector = FaceDetector(
       options: FaceDetectorOptions(
         enableClassification: false,
@@ -82,7 +79,9 @@ class _CameraScreenState extends State<CameraScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_controller == null || !_controller!.value.isInitialized) return;
+    if (_controller == null || !_controller!.value.isInitialized) {
+      return;
+    }
 
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
@@ -119,19 +118,22 @@ class _CameraScreenState extends State<CameraScreen>
         setState(() {
           _isCameraInitialized = true;
         });
-        _mulaiStreamWajah(); // Mulai memantau wajah secara live
+        _mulaiStreamWajah();
       }
     } catch (e) {
       debugPrint('Gagal restart kamera: $e');
     }
   }
 
-  /// Membaca piksel lensa secara langsung tanpa perlu menjepret
   void _mulaiStreamWajah() {
-    if (_controller == null || !_controller!.value.isInitialized) return;
+    if (_controller == null || !_controller!.value.isInitialized) {
+      return;
+    }
 
     _controller!.startImageStream((CameraImage image) async {
-      if (_isDetecting || _isProcessingPhoto) return;
+      if (_isDetecting || _isProcessingPhoto) {
+        return;
+      }
 
       _isDetecting = true;
       try {
@@ -144,7 +146,6 @@ class _CameraScreenState extends State<CameraScreen>
           final faces = await _faceDetector!.processImage(inputImage);
           bool adaWajah = faces.isNotEmpty;
 
-          // Hanya render UI jika ada perubahan status (menghemat RAM)
           if (adaWajah != _isFaceLiveDetected) {
             setState(() {
               _isFaceLiveDetected = adaWajah;
@@ -177,15 +178,13 @@ class _CameraScreenState extends State<CameraScreen>
         setState(() => _statusLoading = "Menghitung Jarak Jangkauan...");
       }
 
-      double jarak = Geolocator.distanceBetween(
-        _posisi!.latitude,
-        _posisi!.longitude,
-        widget.latSekolah,
-        widget.lonSekolah,
-      );
+      double jarak = Geolocator.distanceBetween(_posisi!.latitude,
+          _posisi!.longitude, widget.latSekolah, widget.lonSekolah);
 
       if (jarak > widget.radius && !isDispensasi) {
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
         setState(() => _isLoading = false);
         _tampilkanPesanLuarArea(jarak);
         return;
@@ -260,7 +259,6 @@ class _CameraScreenState extends State<CameraScreen>
   }
 
   Future<void> _ambilFotoDanValidasi() async {
-    // Tombol tidak berfungsi jika belum mendeteksi wajah secara Live
     if (!_isFaceLiveDetected ||
         _controller == null ||
         !_controller!.value.isInitialized ||
@@ -274,7 +272,6 @@ class _CameraScreenState extends State<CameraScreen>
     });
 
     try {
-      // Wajib menghentikan stream sebelum mengambil foto, jika tidak camera plugin akan error
       await _controller!.stopImageStream();
       final XFile file = await _controller!.takePicture();
 
@@ -289,7 +286,7 @@ class _CameraScreenState extends State<CameraScreen>
           _isProcessingPhoto = false;
           _statusPesan = "Arahkan wajah Anda ke kamera";
         });
-        _mulaiStreamWajah(); // Mulai kembali stream jika gagal
+        _mulaiStreamWajah();
       }
     }
   }
@@ -411,12 +408,14 @@ class _CameraScreenState extends State<CameraScreen>
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () {
-                        if (foto.existsSync()) foto.deleteSync();
+                        if (foto.existsSync()) {
+                          foto.deleteSync();
+                        }
                         Navigator.pop(sheetContext);
                         setState(() {
                           _isProcessingPhoto = false;
                         });
-                        _mulaiStreamWajah(); // Restart Stream
+                        _mulaiStreamWajah();
                       },
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -477,6 +476,9 @@ class _CameraScreenState extends State<CameraScreen>
                             lat: lat,
                             lon: lon,
                             isMocked: _isFakeGpsDetected,
+                            accuracy: _posisi?.accuracy ?? 999.0,
+                            deviceTimestamp:
+                                (DateTime.now().millisecondsSinceEpoch ~/ 1000),
                             tipeAbsen: isMasuk ? 'masuk' : 'pulang',
                           );
 
@@ -680,7 +682,6 @@ class _CameraScreenState extends State<CameraScreen>
                 const SizedBox(height: 10),
                 _buildGpsStatusWidget(),
                 const SizedBox(height: 10),
-                // Indikator Pesan Status Live Streaming
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -752,7 +753,6 @@ class _CameraScreenState extends State<CameraScreen>
                                       style: TextStyle(color: Colors.white54))),
                         ),
                       ),
-                      // Frame kamera akan menyala Hijau jika wajah terdeteksi
                       Positioned(
                           top: 10,
                           left: 10,
@@ -835,7 +835,6 @@ class _CameraScreenState extends State<CameraScreen>
                 Padding(
                   padding: const EdgeInsets.only(bottom: 60),
                   child: GestureDetector(
-                    // Tombol DIKUNCI secara sistematis jika tidak ada wajah Live!
                     onTap: (!_isFaceLiveDetected || _isProcessingPhoto)
                         ? null
                         : _ambilFotoDanValidasi,

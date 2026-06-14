@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/utils/secure_storage_helper.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/pengumuman_provider.dart';
 import '../../providers/absensi_provider.dart';
 import '../../repositories/server_repository.dart';
@@ -90,7 +91,9 @@ class _HomeScreenState extends State<HomeScreen> {
     String? foto = await SecureStorageHelper.getFotoProfile();
     String? kelas = await SecureStorageHelper.getUserKelas();
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _namaSiswa = nama ?? 'Siswa';
       _namaKelas = kelas ?? 'Siswa Aktif';
@@ -99,7 +102,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refreshSemuaData() async {
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _isMemuatWaktu = true;
       _isMemuatLokasi = true;
@@ -107,7 +112,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final serverData = await ServerRepository.getServerData();
-      if (!mounted) return;
+
+      if (!mounted) {
+        return;
+      }
 
       if (serverData != null) {
         setState(() {
@@ -143,20 +151,28 @@ class _HomeScreenState extends State<HomeScreen> {
           final absenHariIni =
               await Provider.of<AbsensiProvider>(context, listen: false)
                   .cekAbsenHariIni(tanggalHariIni);
-          if (!mounted) return;
+          if (!mounted) {
+            return;
+          }
           setState(() => _dataAbsenHariIni = absenHariIni);
         } catch (e) {
-          if (e.toString() == 'sesi_habis') _prosesLogoutExpired();
+          if (e.toString() == 'sesi_habis') {
+            _prosesLogoutExpired();
+          }
         }
       }
     } catch (e) {
       debugPrint('Error fetch waktu server: $e');
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() => _isMemuatWaktu = false);
     }
 
     await _updateLokasiJarak();
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     Provider.of<PengumumanProvider>(context, listen: false).fetchPengumuman();
   }
 
@@ -181,7 +197,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
       Position pos = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
-      if (!mounted) return;
+
+      if (!mounted) {
+        return;
+      }
+
       double jarak = Geolocator.distanceBetween(
           pos.latitude, pos.longitude, _latSekolah, _lonSekolah);
       setState(() {
@@ -190,7 +210,9 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } catch (e) {
       debugPrint('Error lokasi: $e');
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _jarakMeter = null;
         _isMemuatLokasi = false;
@@ -199,32 +221,32 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _prosesLogoutExpired() async {
-    await SecureStorageHelper.clearAll();
-    if (!mounted) return;
+    await Provider.of<AuthProvider>(context, listen: false).logout();
+    if (!mounted) {
+      return;
+    }
     Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),
         (route) => false);
   }
 
-  Widget _buildActionMenu({
-    required BuildContext context,
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required MaterialColor color,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildActionMenu(
+      {required BuildContext context,
+      required String title,
+      required String subtitle,
+      required IconData icon,
+      required MaterialColor color,
+      required VoidCallback onTap}) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4)),
         ],
       ),
       child: Material(
@@ -274,15 +296,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (!isTombolDisable && _waktuServer != null) {
       try {
-        List<String> jm = _jamMasukServer.split(':');
         List<String> jp = _jamPulangServer.split(':');
-        DateTime jamMasuk = DateTime(
-            _waktuServer!.year,
-            _waktuServer!.month,
-            _waktuServer!.day,
-            int.parse(jm[0]),
-            int.parse(jm[1]),
-            int.parse(jm[2]));
+        List<String> jb = _jamBukaServer.split(':');
+
         DateTime jamPulang = DateTime(
             _waktuServer!.year,
             _waktuServer!.month,
@@ -290,8 +306,14 @@ class _HomeScreenState extends State<HomeScreen> {
             int.parse(jp[0]),
             int.parse(jp[1]),
             int.parse(jp[2]));
-        DateTime batasAwalMasuk =
-            jamMasuk.subtract(const Duration(minutes: 30));
+
+        DateTime batasAwalMasuk = DateTime(
+            _waktuServer!.year,
+            _waktuServer!.month,
+            _waktuServer!.day,
+            int.parse(jb[0]),
+            int.parse(jb[1]),
+            int.parse(jb[2]));
         DateTime batasAkhirMasuk =
             jamPulang.subtract(const Duration(minutes: 30));
         DateTime batasAkhirPulang = DateTime(_waktuServer!.year,
@@ -437,8 +459,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             MaterialPageRoute(
                                 builder: (_) => const RiwayatScreen())),
                         onLogoutTap: () async {
-                          await SecureStorageHelper.clearAll();
-                          if (!context.mounted) return;
+                          await Provider.of<AuthProvider>(context,
+                                  listen: false)
+                              .logout();
+                          if (!context.mounted) {
+                            return;
+                          }
                           Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(
