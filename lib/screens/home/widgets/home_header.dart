@@ -23,10 +23,10 @@ class HomeHeader extends StatelessWidget {
     required this.onRefreshProfile,
   });
 
-  // TAHAP 3: Variabel static untuk menyimpan URL agar tidak diproses berulang kali
   static String? _cachedHost;
 
-  String _formatWaktuLengkap(DateTime dt) {
+  // Memisahkan format tanggal
+  String _formatTanggal(DateTime dt) {
     List<String> hari = [
       'Senin',
       'Selasa',
@@ -52,18 +52,21 @@ class HomeHeader extends StatelessWidget {
     ];
 
     String namaHari = hari[dt.weekday - 1];
+    return "$namaHari, ${dt.day} ${bulan[dt.month - 1]} ${dt.year}";
+  }
+
+  // Memisahkan format jam
+  String _formatJam(DateTime dt) {
     String jam = dt.hour.toString().padLeft(2, '0');
     String menit = dt.minute.toString().padLeft(2, '0');
     String detik = dt.second.toString().padLeft(2, '0');
-
-    return "$namaHari, ${dt.day} ${bulan[dt.month - 1]} ${dt.year} • $jam:$menit:$detik";
+    return "$jam:$menit:$detik";
   }
 
   String _getValidFotoUrl(String? fileName) {
     if (fileName == null || fileName.isEmpty) return '';
     if (fileName.startsWith('http')) return fileName;
 
-    // TAHAP 3: Cek apakah host sudah tersimpan di memori (cache)
     if (_cachedHost == null) {
       try {
         String baseUrlEnv = dotenv.env['BASE_URL'] ?? '';
@@ -76,7 +79,6 @@ class HomeHeader extends StatelessWidget {
       }
     }
 
-    // Langsung gabungkan dengan cache, jauh lebih cepat!
     return '$_cachedHost/uploads/siswa/$fileName';
   }
 
@@ -102,24 +104,49 @@ class HomeHeader extends StatelessWidget {
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                          horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: ValueListenableBuilder<DateTime?>(
                         valueListenable: waktuServerNotifier,
                         builder: (context, waktu, child) {
-                          return Text(
-                            waktu != null
-                                ? _formatWaktuLengkap(waktu)
-                                : 'Menghubungkan...',
-                            style: const TextStyle(
+                          if (waktu == null) {
+                            return const Text(
+                              'Menghubungkan...',
+                              style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            );
+                          }
+
+                          // Menggunakan Column agar jam berada di bawah hari & tanggal
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _formatTanggal(waktu),
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _formatJam(waktu),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ],
                           );
                         },
                       ),
