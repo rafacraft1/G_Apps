@@ -5,9 +5,10 @@ import '../../profile/profile_screen.dart';
 
 class HomeHeader extends StatelessWidget {
   final String namaSiswa;
-  final String namaKelas; // PENAMBAHAN PARAMETER BARU
+  final String namaKelas;
   final String? fotoUrl;
-  final DateTime? waktuServer;
+  // PERUBAHAN TAHAP 1: Menggunakan ValueNotifier agar hanya jam yang ter-update
+  final ValueNotifier<DateTime?> waktuServerNotifier;
   final VoidCallback onRiwayatTap;
   final VoidCallback onLogoutTap;
   final VoidCallback onRefreshProfile;
@@ -15,9 +16,9 @@ class HomeHeader extends StatelessWidget {
   const HomeHeader({
     super.key,
     required this.namaSiswa,
-    required this.namaKelas, // DIWAJIBKAN DI KONSTRUKTOR
+    required this.namaKelas,
     this.fotoUrl,
-    required this.waktuServer,
+    required this.waktuServerNotifier,
     required this.onRiwayatTap,
     required this.onLogoutTap,
     required this.onRefreshProfile,
@@ -98,16 +99,22 @@ class HomeHeader extends StatelessWidget {
                         color: Colors.black.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Text(
-                        waktuServer != null
-                            ? _formatWaktuLengkap(waktuServer!)
-                            : 'Menghubungkan...',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      // PERUBAHAN TAHAP 1: Widget ini sekarang mendengarkan detak waktu mandiri
+                      child: ValueListenableBuilder<DateTime?>(
+                        valueListenable: waktuServerNotifier,
+                        builder: (context, waktu, child) {
+                          return Text(
+                            waktu != null
+                                ? _formatWaktuLengkap(waktu)
+                                : 'Menghubungkan...',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -180,8 +187,7 @@ class HomeHeader extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4), // Jeda Spacing Elegan
-                        // PENAMBAHAN: Render Teks Nama Kelas di Bawah Nama Siswa
+                        const SizedBox(height: 4),
                         Text(
                           namaKelas != 'Siswa Aktif'
                               ? 'Kelas $namaKelas'

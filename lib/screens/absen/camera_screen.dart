@@ -6,8 +6,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
+
 import '../../core/utils/location_helper.dart';
-import '../../core/utils/camera_ml_helper.dart';
 import '../../providers/absensi_provider.dart';
 import '../../core/utils/secure_storage_helper.dart';
 import '../auth/login_screen.dart';
@@ -40,12 +40,10 @@ class _CameraScreenState extends State<CameraScreen>
   bool _isFakeGpsDetected = false;
 
   FaceDetector? _faceDetector;
-  bool _isDetecting = false;
-  bool _isFaceLiveDetected = false;
+  bool _isProcessingPhoto = false;
 
   String _statusLoading = "Mencari Satelit GPS...";
   String _statusPesan = "Arahkan wajah Anda ke kamera";
-  bool _isProcessingPhoto = false;
 
   late bool isDispensasi;
   late bool isMasuk;
@@ -61,7 +59,8 @@ class _CameraScreenState extends State<CameraScreen>
       options: FaceDetectorOptions(
         enableClassification: false,
         enableLandmarks: false,
-        performanceMode: FaceDetectorMode.fast,
+        performanceMode:
+            FaceDetectorMode.fast, // Cukup mode fast untuk deteksi statis
       ),
     );
 
@@ -71,7 +70,6 @@ class _CameraScreenState extends State<CameraScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _controller?.stopImageStream();
     _faceDetector?.close();
     _controller?.dispose();
     super.dispose();
@@ -85,12 +83,10 @@ class _CameraScreenState extends State<CameraScreen>
 
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
-      _controller?.stopImageStream();
       _controller?.dispose();
       if (mounted) {
         setState(() {
           _isCameraInitialized = false;
-          _isFaceLiveDetected = false;
         });
       }
     } else if (state == AppLifecycleState.resumed) {
@@ -106,11 +102,10 @@ class _CameraScreenState extends State<CameraScreen>
         orElse: () => cameras.first,
       );
 
-      // PERBAIKAN: imageFormatGroup NV21 dihapus agar hardware kamera Xiaomi tidak crash (Error 4/5)
-      // Resolusi dinaikkan menjadi High agar akurasi pemindaian ML Kit lebih maksimal
       _controller = CameraController(
         _kameraDepan!,
-        ResolutionPreset.high,
+        ResolutionPreset
+            .medium, // Medium sangat optimal untuk ML Kit & Hemat RAM
         enableAudio: false,
       );
 
@@ -120,49 +115,10 @@ class _CameraScreenState extends State<CameraScreen>
         setState(() {
           _isCameraInitialized = true;
         });
-        _mulaiStreamWajah();
       }
     } catch (e) {
       debugPrint('Gagal restart kamera: $e');
     }
-  }
-
-  void _mulaiStreamWajah() {
-    if (_controller == null || !_controller!.value.isInitialized) {
-      return;
-    }
-
-    _controller!.startImageStream((CameraImage image) async {
-      if (_isDetecting || _isProcessingPhoto) {
-        return;
-      }
-
-      _isDetecting = true;
-      try {
-        final inputImage = CameraMlHelper.inputImageFromCameraImage(
-          image: image,
-          camera: _kameraDepan!,
-        );
-
-        if (inputImage != null && mounted) {
-          final faces = await _faceDetector!.processImage(inputImage);
-          bool adaWajah = faces.isNotEmpty;
-
-          if (adaWajah != _isFaceLiveDetected) {
-            setState(() {
-              _isFaceLiveDetected = adaWajah;
-              _statusPesan = adaWajah
-                  ? "Wajah Terdeteksi! Silakan Absen."
-                  : "Arahkan wajah Anda ke kamera";
-            });
-          }
-        }
-      } catch (e) {
-        debugPrint('Error Live ML Kit: $e');
-      } finally {
-        _isDetecting = false;
-      }
-    });
   }
 
   Future<void> _initCameraAndLocation() async {
@@ -184,9 +140,7 @@ class _CameraScreenState extends State<CameraScreen>
           _posisi!.longitude, widget.latSekolah, widget.lonSekolah);
 
       if (jarak > widget.radius && !isDispensasi) {
-        if (!mounted) {
-          return;
-        }
+        if (!mounted) return;
         setState(() => _isLoading = false);
         _tampilkanPesanLuarArea(jarak);
         return;
@@ -248,8 +202,8 @@ class _CameraScreenState extends State<CameraScreen>
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16))),
               onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context);
+                Navigator.pop(context); // Tutup dialog
+                Navigator.pop(context); // Kembali ke halaman sebelumnya
               },
               child: const Text('Kembali',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -261,8 +215,7 @@ class _CameraScreenState extends State<CameraScreen>
   }
 
   Future<void> _ambilFotoDanValidasi() async {
-    if (!_isFaceLiveDetected ||
-        _controller == null ||
+    if (_controller == null ||
         !_controller!.value.isInitialized ||
         _isProcessingPhoto) {
       return;
@@ -270,25 +223,62 @@ class _CameraScreenState extends State<CameraScreen>
 
     setState(() {
       _isProcessingPhoto = true;
-      _statusPesan = "Memproses absensi...";
+      _statusPesan = "Memproses foto & mendeteksi wajah...";
     });
 
     try {
-      await _controller!.stopImageStream();
-      final XFile file = await _controller!.takePicture();
+      // 1. Bekukan layar kamera agar terlihat ada respons saat tombol ditekan
+      await _controller!.pausePreview();
 
+      // 2. Ambil Foto
+      final XFile file = await _controller!.takePicture();
+      final File fotoFile = File(file.path);
+
+      // 3. Deteksi wajah menggunakan file statis
+      final inputImage = InputImage.fromFilePath(file.path);
+      final faces = await _faceDetector!.processImage(inputImage);
+
+      // 4. Validasi hasil deteksi
+      if (faces.isEmpty) {
+        // Wajah tidak ditemukan, hapus file temporary untuk menghemat storage
+        if (fotoFile.existsSync()) fotoFile.deleteSync();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: const Text(
+                'Wajah tidak terdeteksi! Pastikan wajah terlihat jelas.',
+                style: TextStyle(color: Colors.white)),
+            backgroundColor: Colors.red[700],
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ));
+          setState(() {
+            _isProcessingPhoto = false;
+            _statusPesan = "Arahkan wajah Anda ke kamera";
+          });
+          // Lanjutkan kembali kamera
+          await _controller!.resumePreview();
+        }
+        return;
+      }
+
+      // 5. Wajah ditemukan, tampilkan preview untuk dikirim
       if (mounted) {
-        _tampilkanPreviewAbsen(
-            File(file.path), _posisi!.latitude, _posisi!.longitude);
+        setState(() {
+          _statusPesan = "Wajah terdeteksi! Menyiapkan preview...";
+        });
+        _tampilkanPreviewAbsen(fotoFile, _posisi!.latitude, _posisi!.longitude);
       }
     } catch (e) {
       debugPrint('Error ambil foto: $e');
       if (mounted) {
         setState(() {
           _isProcessingPhoto = false;
-          _statusPesan = "Arahkan wajah Anda ke kamera";
+          _statusPesan = "Gagal mengambil foto. Coba lagi.";
         });
-        _mulaiStreamWajah();
+        // Lanjutkan kembali jika terjadi error
+        await _controller!.resumePreview();
       }
     }
   }
@@ -351,7 +341,8 @@ class _CameraScreenState extends State<CameraScreen>
                     aspectRatio: 1.0,
                     child: Transform(
                       alignment: Alignment.center,
-                      transform: Matrix4.rotationY(math.pi),
+                      transform: Matrix4.rotationY(
+                          math.pi), // Mirror foto kamera depan
                       child: Image.file(foto,
                           width: double.infinity, fit: BoxFit.cover),
                     ),
@@ -409,15 +400,17 @@ class _CameraScreenState extends State<CameraScreen>
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () {
-                        if (foto.existsSync()) {
-                          foto.deleteSync();
-                        }
+                      onPressed: () async {
+                        // Jika Batal / Foto Ulang
+                        if (foto.existsSync()) foto.deleteSync();
                         Navigator.pop(sheetContext);
                         setState(() {
                           _isProcessingPhoto = false;
+                          _statusPesan = "Arahkan wajah Anda ke kamera";
                         });
-                        _mulaiStreamWajah();
+
+                        // Hidupkan kembali kamera yang tadi di-pause
+                        await _controller!.resumePreview();
                       },
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -443,8 +436,9 @@ class _CameraScreenState extends State<CameraScreen>
                             Navigator.of(context, rootNavigator: true);
                         final navigatorLokal = Navigator.of(context);
 
-                        Navigator.pop(sheetContext);
+                        Navigator.pop(sheetContext); // Tutup bottomsheet
 
+                        // Tampilkan indikator loading saat upload ke server
                         showDialog(
                           context: context,
                           barrierDismissible: false,
@@ -484,9 +478,9 @@ class _CameraScreenState extends State<CameraScreen>
                             tipeAbsen: isMasuk ? 'masuk' : 'pulang',
                           );
 
-                          navigatorRoot.pop();
+                          navigatorRoot.pop(); // Tutup indikator loading
                           if (sukses && mounted) {
-                            navigatorLokal.pop();
+                            navigatorLokal.pop(); // Kembali ke dashboard
                             scaffoldMessenger.showSnackBar(
                               SnackBar(
                                 content:
@@ -499,9 +493,10 @@ class _CameraScreenState extends State<CameraScreen>
                             );
                           }
                         } catch (e) {
-                          navigatorRoot.pop();
+                          navigatorRoot.pop(); // Tutup loading saat error
                           if (mounted) {
                             String pesanError = e.toString();
+                            // Handle khusus error Fake GPS
                             if (pesanError.toLowerCase().contains('fake gps') ||
                                 pesanError.toLowerCase().contains('diblokir')) {
                               showDialog(
@@ -543,9 +538,11 @@ class _CameraScreenState extends State<CameraScreen>
                               );
                               return;
                             }
+                            // Munculkan toast error umum
                             scaffoldMessenger.showSnackBar(SnackBar(
                                 content: Text(pesanError),
                                 backgroundColor: Colors.red));
+                            // Tendang ke halaman login jika token expired
                             if (pesanError.toLowerCase().contains('token') ||
                                 pesanError.toLowerCase().contains('sesi')) {
                               await SecureStorageHelper.clearAll();
@@ -557,6 +554,13 @@ class _CameraScreenState extends State<CameraScreen>
                                     (route) => false);
                               }
                             }
+
+                            // Karena gagal submit, persiapkan kamera lagi jika user batal kembali ke menu
+                            setState(() {
+                              _isProcessingPhoto = false;
+                              _statusPesan = "Arahkan wajah Anda ke kamera";
+                            });
+                            await _controller!.resumePreview();
                           }
                         }
                       },
@@ -688,14 +692,8 @@ class _CameraScreenState extends State<CameraScreen>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: _isFaceLiveDetected
-                        ? Colors.green.withOpacity(0.2)
-                        : Colors.white.withOpacity(0.1),
+                    color: Colors.white.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                        color: _isFaceLiveDetected
-                            ? Colors.green.withOpacity(0.5)
-                            : Colors.transparent),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -706,20 +704,12 @@ class _CameraScreenState extends State<CameraScreen>
                               height: 16,
                               child: CircularProgressIndicator(
                                   color: Colors.white, strokeWidth: 2))
-                          : Icon(
-                              _isFaceLiveDetected
-                                  ? Icons.face_retouching_natural_rounded
-                                  : Icons.face_rounded,
-                              color: _isFaceLiveDetected
-                                  ? Colors.greenAccent
-                                  : Colors.white70,
-                              size: 18),
+                          : const Icon(Icons.face_rounded,
+                              color: Colors.white70, size: 18),
                       const SizedBox(width: 8),
                       Text(_statusPesan,
-                          style: TextStyle(
-                              color: _isFaceLiveDetected
-                                  ? Colors.greenAccent
-                                  : Colors.white,
+                          style: const TextStyle(
+                              color: Colors.white,
                               fontSize: 12,
                               fontWeight: FontWeight.bold)),
                     ],
@@ -728,142 +718,55 @@ class _CameraScreenState extends State<CameraScreen>
                 const Spacer(),
                 AspectRatio(
                   aspectRatio: 1.0,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(32)),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(32),
-                          child: _isCameraInitialized && _controller != null
-                              ? SizedBox(
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  child: FittedBox(
-                                    fit: BoxFit.cover,
-                                    child: SizedBox(
-                                        width: 100,
-                                        height: 100 *
-                                            _controller!.value.aspectRatio,
-                                        child: CameraPreview(_controller!)),
-                                  ),
-                                )
-                              : const Center(
-                                  child: Text('Memuat Lensa...',
-                                      style: TextStyle(color: Colors.white54))),
-                        ),
-                      ),
-                      Positioned(
-                          top: 10,
-                          left: 10,
-                          child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                  border: Border(
-                                      top: BorderSide(
-                                          color: _isFaceLiveDetected
-                                              ? Colors.greenAccent
-                                              : temaWarna,
-                                          width: 4),
-                                      left: BorderSide(
-                                          color: _isFaceLiveDetected
-                                              ? Colors.greenAccent
-                                              : temaWarna,
-                                          width: 4))))),
-                      Positioned(
-                          top: 10,
-                          right: 10,
-                          child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                  border: Border(
-                                      top: BorderSide(
-                                          color: _isFaceLiveDetected
-                                              ? Colors.greenAccent
-                                              : temaWarna,
-                                          width: 4),
-                                      right: BorderSide(
-                                          color: _isFaceLiveDetected
-                                              ? Colors.greenAccent
-                                              : temaWarna,
-                                          width: 4))))),
-                      Positioned(
-                          bottom: 10,
-                          left: 10,
-                          child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                  border: Border(
-                                      bottom: BorderSide(
-                                          color: _isFaceLiveDetected
-                                              ? Colors.greenAccent
-                                              : temaWarna,
-                                          width: 4),
-                                      left: BorderSide(
-                                          color: _isFaceLiveDetected
-                                              ? Colors.greenAccent
-                                              : temaWarna,
-                                          width: 4))))),
-                      Positioned(
-                          bottom: 10,
-                          right: 10,
-                          child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                  border: Border(
-                                      bottom: BorderSide(
-                                          color: _isFaceLiveDetected
-                                              ? Colors.greenAccent
-                                              : temaWarna,
-                                          width: 4),
-                                      right: BorderSide(
-                                          color: _isFaceLiveDetected
-                                              ? Colors.greenAccent
-                                              : temaWarna,
-                                          width: 4))))),
-                    ],
+                  child: Container(
+                    margin: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(32),
+                        border: Border.all(
+                            color: temaWarna.withOpacity(0.5), width: 3)),
+                    child: ClipRRect(
+                      borderRadius:
+                          BorderRadius.circular(29), // Menyesuaikan border luar
+                      child: _isCameraInitialized && _controller != null
+                          ? SizedBox(
+                              width: double.infinity,
+                              height: double.infinity,
+                              child: FittedBox(
+                                fit: BoxFit.cover,
+                                child: SizedBox(
+                                    width: 100,
+                                    height:
+                                        100 * _controller!.value.aspectRatio,
+                                    child: CameraPreview(_controller!)),
+                              ),
+                            )
+                          : const Center(
+                              child: Text('Memuat Lensa...',
+                                  style: TextStyle(color: Colors.white54))),
+                    ),
                   ),
                 ),
                 const Spacer(),
-                const Text('Tidak bisa absen jika wajah belum terdeteksi.',
+                const Text('Silakan tekan tombol untuk mengambil foto.',
                     style: TextStyle(color: Colors.white54, fontSize: 13)),
                 const SizedBox(height: 24),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 60),
                   child: GestureDetector(
-                    onTap: (!_isFaceLiveDetected || _isProcessingPhoto)
-                        ? null
-                        : _ambilFotoDanValidasi,
+                    onTap: _isProcessingPhoto ? null : _ambilFotoDanValidasi,
                     child: Opacity(
-                      opacity: (!_isFaceLiveDetected || _isProcessingPhoto)
-                          ? 0.3
-                          : 1.0,
+                      opacity: _isProcessingPhoto ? 0.5 : 1.0,
                       child: Container(
                         height: 84,
                         width: 84,
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(
-                              color:
-                                  (!_isFaceLiveDetected || _isProcessingPhoto)
-                                      ? Colors.grey
-                                      : temaWarna,
-                              width: 3),
+                          border: Border.all(color: temaWarna, width: 3),
                         ),
                         child: Container(
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: (!_isFaceLiveDetected || _isProcessingPhoto)
-                                ? Colors.grey
-                                : temaWarna,
-                          ),
+                              shape: BoxShape.circle, color: temaWarna),
                           child: const Icon(Icons.camera_rounded,
                               color: Colors.white, size: 36),
                         ),

@@ -35,7 +35,9 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _fotoUrl;
   Timer? _timer;
 
-  DateTime? _waktuServer;
+  // PERUBAHAN TAHAP 1: Ganti variabel biasa menjadi ValueNotifier
+  final ValueNotifier<DateTime?> _waktuServerNotifier = ValueNotifier(null);
+
   bool _isMemuatWaktu = true;
   Map<String, dynamic>? _dataAbsenHariIni;
 
@@ -59,11 +61,11 @@ class _HomeScreenState extends State<HomeScreen> {
     _updateFCMToken();
     _refreshSemuaData();
 
+    // PERUBAHAN TAHAP 1: Timer tidak lagi menggunakan setState()! Tidak ada lagi HP panas/lag.
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_waktuServer != null && mounted) {
-        setState(() {
-          _waktuServer = _waktuServer!.add(const Duration(seconds: 1));
-        });
+      if (_waktuServerNotifier.value != null) {
+        _waktuServerNotifier.value =
+            _waktuServerNotifier.value!.add(const Duration(seconds: 1));
       }
     });
   }
@@ -71,12 +73,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _waktuServerNotifier.dispose();
     super.dispose();
   }
 
   Future<void> _updateFCMToken() async {
     try {
-      // Cek apakah user memiliki token aktif sebelum hit API untuk mencegah error 401
       String? token = await SecureStorageHelper.getToken();
       if (token == null || token.isEmpty) return;
 
@@ -118,8 +120,10 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
 
       if (serverData != null) {
+        // PERUBAHAN TAHAP 1: Memperbarui ValueNotifier
+        _waktuServerNotifier.value = serverData['waktu'];
+
         setState(() {
-          _waktuServer = serverData['waktu'];
           _isLibur = serverData['is_libur'] ?? false;
           _namaLibur =
               serverData['nama_libur'] ?? serverData['keterangan'] ?? '';
@@ -127,7 +131,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _jamMasukServer = serverData['jam_masuk'] ?? "07:00:00";
           _jamPulangServer = serverData['jam_pulang'] ?? "15:00:00";
 
-          // PERBAIKAN BUG NULL SAFETY DI SINI
           Map<String, dynamic>? pengaturan =
               serverData['pengaturan'] as Map<String, dynamic>?;
           _jamBukaServer = pengaturan?['jam_buka'] ?? "06:00:00";
@@ -148,9 +151,9 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _isMemuatWaktu = false);
       }
 
-      if (_waktuServer != null) {
+      if (_waktuServerNotifier.value != null) {
         String tanggalHariIni =
-            "${_waktuServer!.year}-${_waktuServer!.month.toString().padLeft(2, '0')}-${_waktuServer!.day.toString().padLeft(2, '0')}";
+            "${_waktuServerNotifier.value!.year}-${_waktuServerNotifier.value!.month.toString().padLeft(2, '0')}-${_waktuServerNotifier.value!.day.toString().padLeft(2, '0')}";
         try {
           final absenHariIni =
               await Provider.of<AbsensiProvider>(context, listen: false)
@@ -159,7 +162,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
           setState(() => _dataAbsenHariIni = absenHariIni);
         } catch (e) {
-          // Tangani jika sesi API benar-benar habis
           if (e.toString().contains('sesi_habis') ||
               e.toString().contains('401')) {
             _prosesLogoutExpired();
@@ -290,30 +292,33 @@ class _HomeScreenState extends State<HomeScreen> {
     bool isTombolDisable = _isMemuatWaktu || _isMemuatLokasi;
     String tipeAbsen = 'masuk';
 
-    if (!isTombolDisable && _waktuServer != null) {
+    // PERUBAHAN TAHAP 1: Baca dari Notifier (untuk inisialisasi tombol awal saja)
+    DateTime? waktuSaatIni = _waktuServerNotifier.value;
+
+    if (!isTombolDisable && waktuSaatIni != null) {
       try {
         List<String> jp = _jamPulangServer.split(':');
         List<String> jb = _jamBukaServer.split(':');
 
         DateTime jamPulang = DateTime(
-            _waktuServer!.year,
-            _waktuServer!.month,
-            _waktuServer!.day,
+            waktuSaatIni.year,
+            waktuSaatIni.month,
+            waktuSaatIni.day,
             int.parse(jp[0]),
             int.parse(jp[1]),
             int.parse(jp[2]));
 
         DateTime batasAwalMasuk = DateTime(
-            _waktuServer!.year,
-            _waktuServer!.month,
-            _waktuServer!.day,
+            waktuSaatIni.year,
+            waktuSaatIni.month,
+            waktuSaatIni.day,
             int.parse(jb[0]),
             int.parse(jb[1]),
             int.parse(jb[2]));
         DateTime batasAkhirMasuk =
             jamPulang.subtract(const Duration(minutes: 30));
-        DateTime batasAkhirPulang = DateTime(_waktuServer!.year,
-            _waktuServer!.month, _waktuServer!.day, 23, 0, 0);
+        DateTime batasAkhirPulang = DateTime(
+            waktuSaatIni.year, waktuSaatIni.month, waktuSaatIni.day, 23, 0, 0);
 
         if (_isLibur) {
           statusHariIni = 'Libur';
@@ -325,7 +330,7 @@ class _HomeScreenState extends State<HomeScreen> {
           isTombolDisable = true;
         } else if (_dataAbsenHariIni == null) {
           tipeAbsen = 'masuk';
-          if (_waktuServer!.isAfter(batasAkhirMasuk)) {
+          if (waktuSaatIni.isAfter(batasAkhirMasuk)) {
             statusHariIni = 'Alpa';
             warnaStatus = Colors.red;
             labelTombol = 'Waktu Habis';
@@ -336,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
           } else {
             statusHariIni = 'Belum Absen';
             warnaStatus = Colors.orange;
-            if (_waktuServer!.isBefore(batasAwalMasuk)) {
+            if (waktuSaatIni.isBefore(batasAwalMasuk)) {
               labelTombol = 'Belum Waktunya';
               subLabel =
                   'Dibuka pukul ${batasAwalMasuk.hour.toString().padLeft(2, '0')}:${batasAwalMasuk.minute.toString().padLeft(2, '0')}';
@@ -396,14 +401,14 @@ class _HomeScreenState extends State<HomeScreen> {
             tipeAbsen = 'pulang';
             statusHariIni = 'Belum Absen Pulang';
             warnaStatus = Colors.blue;
-            if (_waktuServer!.isBefore(jamPulang)) {
+            if (waktuSaatIni.isBefore(jamPulang)) {
               labelTombol = 'Belum Jam Pulang';
               subLabel =
                   'Pulang pukul ${jamPulang.hour.toString().padLeft(2, '0')}:${jamPulang.minute.toString().padLeft(2, '0')}';
               warnaTombol = Colors.grey;
               iconTombol = Icons.lock;
               isTombolDisable = true;
-            } else if (_waktuServer!.isAfter(batasAkhirPulang)) {
+            } else if (waktuSaatIni.isAfter(batasAkhirPulang)) {
               labelTombol = 'Sesi Berakhir';
               subLabel = 'Batas absen 23:00';
               warnaTombol = Colors.red;
@@ -448,7 +453,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         namaSiswa: _namaSiswa,
                         namaKelas: _namaKelas,
                         fotoUrl: _fotoUrl,
-                        waktuServer: _waktuServer,
+                        // PERUBAHAN TAHAP 1: Kirimkan Notifier ke Header
+                        waktuServerNotifier: _waktuServerNotifier,
                         onRefreshProfile: _loadProfileData,
                         onRiwayatTap: () => Navigator.push(
                             context,
@@ -459,7 +465,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                   listen: false)
                               .logout();
                           if (!context.mounted) return;
-
                           Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(
@@ -475,7 +480,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           isMemuat: _isMemuatWaktu,
                           statusHadir: statusHariIni,
                           statusHadirColor: warnaStatus,
-                          waktuServer: _waktuServer,
+                          waktuServer:
+                              waktuSaatIni, // Statis, tidak butuh render tiap detik
                           jamMasukServer: _jamMasukServer,
                           jamPulangServer: _jamPulangServer,
                           jarakMeter: _jarakMeter,
