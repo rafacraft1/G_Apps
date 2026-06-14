@@ -35,7 +35,6 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _fotoUrl;
   Timer? _timer;
 
-  // PERUBAHAN TAHAP 1: Ganti variabel biasa menjadi ValueNotifier
   final ValueNotifier<DateTime?> _waktuServerNotifier = ValueNotifier(null);
 
   bool _isMemuatWaktu = true;
@@ -51,6 +50,9 @@ class _HomeScreenState extends State<HomeScreen> {
   double _lonSekolah = 0.0;
   double _radius = 50.0;
 
+  // PENAMBAHAN: Variabel untuk menyimpan Nama Zona
+  String _namaZona = 'Area Sekolah';
+
   double? _jarakMeter;
   bool _isMemuatLokasi = true;
 
@@ -61,7 +63,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _updateFCMToken();
     _refreshSemuaData();
 
-    // PERUBAHAN TAHAP 1: Timer tidak lagi menggunakan setState()! Tidak ada lagi HP panas/lag.
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_waktuServerNotifier.value != null) {
         _waktuServerNotifier.value =
@@ -120,14 +121,12 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
 
       if (serverData != null) {
-        // PERUBAHAN TAHAP 1: Memperbarui ValueNotifier
         _waktuServerNotifier.value = serverData['waktu'];
 
         setState(() {
           _isLibur = serverData['is_libur'] ?? false;
           _namaLibur =
               serverData['nama_libur'] ?? serverData['keterangan'] ?? '';
-
           _jamMasukServer = serverData['jam_masuk'] ?? "07:00:00";
           _jamPulangServer = serverData['jam_pulang'] ?? "15:00:00";
 
@@ -145,6 +144,9 @@ class _HomeScreenState extends State<HomeScreen> {
               double.tryParse(serverData['radius']?.toString() ?? '50.0') ??
                   50.0;
 
+          // PENAMBAHAN: Menangkap nama_zona dari JSON Response (Bisa ganti key "nama_zona" sesuai di BE)
+          _namaZona = serverData['nama_zona'] ?? 'Area Sekolah';
+
           _isMemuatWaktu = false;
         });
       } else {
@@ -159,7 +161,6 @@ class _HomeScreenState extends State<HomeScreen> {
               await Provider.of<AbsensiProvider>(context, listen: false)
                   .cekAbsenHariIni(tanggalHariIni);
           if (!mounted) return;
-
           setState(() => _dataAbsenHariIni = absenHariIni);
         } catch (e) {
           if (e.toString().contains('sesi_habis') ||
@@ -229,60 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
         (route) => false);
   }
 
-  Widget _buildActionMenu(
-      {required BuildContext context,
-      required String title,
-      required String subtitle,
-      required IconData icon,
-      required MaterialColor color,
-      required VoidCallback onTap}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration:
-                      BoxDecoration(color: color[50], shape: BoxShape.circle),
-                  child: Icon(icon, color: color[700], size: 24),
-                ),
-                const SizedBox(height: 16),
-                Text(title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.black87)),
-                const SizedBox(height: 4),
-                Text(subtitle,
-                    style:
-                        const TextStyle(fontSize: 11, color: Colors.black54)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Map<String, dynamic> _getKonfigurasiAbsen(DateTime? waktuSaatIni) {
     String statusHariIni = 'Memuat...';
     Color warnaStatus = Colors.grey;
     String labelTombol = 'Memuat...';
@@ -291,9 +239,6 @@ class _HomeScreenState extends State<HomeScreen> {
     IconData iconTombol = Icons.hourglass_empty;
     bool isTombolDisable = _isMemuatWaktu || _isMemuatLokasi;
     String tipeAbsen = 'masuk';
-
-    // PERUBAHAN TAHAP 1: Baca dari Notifier (untuk inisialisasi tombol awal saja)
-    DateTime? waktuSaatIni = _waktuServerNotifier.value;
 
     if (!isTombolDisable && waktuSaatIni != null) {
       try {
@@ -434,6 +379,74 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
+    return {
+      'statusHariIni': statusHariIni,
+      'warnaStatus': warnaStatus,
+      'labelTombol': labelTombol,
+      'subLabel': subLabel,
+      'warnaTombol': warnaTombol,
+      'iconTombol': iconTombol,
+      'isTombolDisable': isTombolDisable,
+      'tipeAbsen': tipeAbsen,
+    };
+  }
+
+  Widget _buildActionMenu(
+      {required BuildContext context,
+      required String title,
+      required String subtitle,
+      required IconData icon,
+      required MaterialColor color,
+      required VoidCallback onTap}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration:
+                      BoxDecoration(color: color[50], shape: BoxShape.circle),
+                  child: Icon(icon, color: color[700], size: 24),
+                ),
+                const SizedBox(height: 16),
+                Text(title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Colors.black87)),
+                const SizedBox(height: 4),
+                Text(subtitle,
+                    style:
+                        const TextStyle(fontSize: 11, color: Colors.black54)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final config = _getKonfigurasiAbsen(_waktuServerNotifier.value);
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       body: RefreshIndicator(
@@ -453,7 +466,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         namaSiswa: _namaSiswa,
                         namaKelas: _namaKelas,
                         fotoUrl: _fotoUrl,
-                        // PERUBAHAN TAHAP 1: Kirimkan Notifier ke Header
                         waktuServerNotifier: _waktuServerNotifier,
                         onRefreshProfile: _loadProfileData,
                         onRiwayatTap: () => Navigator.push(
@@ -478,14 +490,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         right: 20,
                         child: StatusCard(
                           isMemuat: _isMemuatWaktu,
-                          statusHadir: statusHariIni,
-                          statusHadirColor: warnaStatus,
-                          waktuServer:
-                              waktuSaatIni, // Statis, tidak butuh render tiap detik
+                          statusHadir: config['statusHariIni'],
+                          statusHadirColor: config['warnaStatus'],
+                          waktuServer: _waktuServerNotifier.value,
                           jamMasukServer: _jamMasukServer,
                           jamPulangServer: _jamPulangServer,
                           jarakMeter: _jarakMeter,
                           isMemuatLokasi: _isMemuatLokasi,
+                          // PENAMBAHAN: Mengirim namaZona ke StatusCard
+                          namaZona: _namaZona,
                         ),
                       ),
                     ],
@@ -559,14 +572,14 @@ class _HomeScreenState extends State<HomeScreen> {
           width: double.infinity,
           height: 65,
           child: ElevatedButton(
-            onPressed: isTombolDisable
+            onPressed: config['isTombolDisable']
                 ? null
                 : () async {
                     await Navigator.push(
                         context,
                         MaterialPageRoute(
                             builder: (_) => CameraScreen(
-                                  tipeAbsen: tipeAbsen,
+                                  tipeAbsen: config['tipeAbsen'],
                                   latSekolah: _latSekolah,
                                   lonSekolah: _lonSekolah,
                                   radius: _radius,
@@ -574,24 +587,25 @@ class _HomeScreenState extends State<HomeScreen> {
                     _refreshSemuaData();
                   },
             style: ElevatedButton.styleFrom(
-              backgroundColor: warnaTombol,
-              disabledBackgroundColor: warnaTombol.withOpacity(0.8),
+              backgroundColor: config['warnaTombol'],
+              disabledBackgroundColor:
+                  (config['warnaTombol'] as Color).withOpacity(0.8),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(iconTombol, color: Colors.white),
+                Icon(config['iconTombol'], color: Colors.white),
                 const SizedBox(width: 12),
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(labelTombol,
+                    Text(config['labelTombol'],
                         style: const TextStyle(
                             fontWeight: FontWeight.bold, color: Colors.white)),
-                    Text(subLabel,
+                    Text(config['subLabel'],
                         style: const TextStyle(
                             fontSize: 12, color: Colors.white70)),
                   ],

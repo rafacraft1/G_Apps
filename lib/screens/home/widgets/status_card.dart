@@ -9,6 +9,8 @@ class StatusCard extends StatelessWidget {
   final String jamPulangServer;
   final double? jarakMeter;
   final bool isMemuatLokasi;
+  // PENAMBAHAN: Parameter baru untuk menerima nama zona dari Home Screen
+  final String namaZona;
 
   const StatusCard({
     super.key,
@@ -20,6 +22,7 @@ class StatusCard extends StatelessWidget {
     required this.jamPulangServer,
     required this.jarakMeter,
     required this.isMemuatLokasi,
+    required this.namaZona,
   });
 
   @override
@@ -138,11 +141,16 @@ class StatusCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Deteksi Lokasi Anda',
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87)),
+                        // PERUBAHAN: Teks menampilkan Nama Zona yang reaktif
+                        Text(
+                          namaZona,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         const SizedBox(height: 2),
                         isMemuatLokasi
                             ? const Text('Mencari sinyal satelit...',
@@ -150,7 +158,7 @@ class StatusCard extends StatelessWidget {
                                     fontSize: 11, color: Colors.black54))
                             : Text(
                                 jarakMeter != null
-                                    ? '${jarakMeter!.toStringAsFixed(1)} m dari sekolah'
+                                    ? '${jarakMeter!.toStringAsFixed(1)} m dari pusat zona'
                                     : 'Akses GPS ditolak',
                                 style: TextStyle(
                                     fontSize: 11,
