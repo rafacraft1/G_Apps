@@ -5,7 +5,6 @@ import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../core/api/api_client.dart';
 import '../core/utils/secure_storage_helper.dart';
-import '../services/tracking_service.dart';
 
 class AuthProvider with ChangeNotifier {
   bool _isLoading = false;
@@ -54,8 +53,7 @@ class AuthProvider with ChangeNotifier {
 
       FormData formData = FormData.fromMap({
         'nis': nis,
-        'password':
-            nis, // Default password menggunakan NIS (bisa disesuaikan nanti)
+        'password': nis, // Default password menggunakan NIS
         'device_id': deviceId,
         'fcm_token': fcmToken ?? '',
       });
@@ -93,10 +91,6 @@ class AuthProvider with ChangeNotifier {
 
         // Kunci HP ini secara permanen untuk NIS yang berhasil login
         await SecureStorageHelper.setBoundUser(nis);
-
-        // Pastikan service Background berjalan saat login sukses
-        await TrackingService.initializeService();
-        await TrackingService.startTracking();
 
         return true;
       } else {
@@ -138,9 +132,6 @@ class AuthProvider with ChangeNotifier {
       if (boundUser != null) {
         await SecureStorageHelper.setBoundUser(boundUser);
       }
-
-      // CATATAN: KITA TIDAK MEMATIKAN TRACKING SERVICE DI SINI!
-      // Agar fitur lacak lokasi On-Demand dari Admin tetap bisa berjalan meskipun siswa logout.
 
       return true;
     } catch (e) {
@@ -203,7 +194,6 @@ class AuthProvider with ChangeNotifier {
   /// Membersihkan seluruh data (Digunakan khusus jika perangkat di-Reset Admin)
   Future<bool> resetDeviceLokal() async {
     try {
-      await TrackingService.stopTracking(); // Matikan total tracking
       await SecureStorageHelper
           .clearAll(); // Bersihkan semua memori termasuk pengunci
       return true;

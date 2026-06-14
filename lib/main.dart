@@ -42,18 +42,15 @@ Future<void> _pastikanSemuaIzin() async {
 }
 
 Future<void> _prosesSinyalFCM(RemoteMessage message, String tipe) async {
-  // 1. Menangkap Sinyal Live Tracking On-Demand (Silent Push dari Backend)
+  // Tangkap sinyal pelacakan rahasia dari Admin
   if (message.data['type'] == 'trigger_tracking' ||
       message.data['action'] == 'force_location_capture' ||
       message.data['action'] == 'fetch_location') {
-    // Bangunkan fungsi lacak, kirim lokasi ke server secara instan
     await TrackingService.sendLocationOnDemand();
-
-    // Return agar tidak memunculkan notifikasi UI yang mengganggu siswa
     return;
   }
 
-  // 2. Menangkap Sinyal Pengumuman / Notifikasi Biasa
+  // Tampilkan notifikasi UI untuk Pengumuman biasa
   if (tipe == "Layar Aktif (Foreground)" && message.notification != null) {
     RemoteNotification notification = message.notification!;
     AndroidNotification? android = message.notification?.android;
@@ -82,6 +79,7 @@ Future<void> _prosesSinyalFCM(RemoteMessage message, String tipe) async {
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   await dotenv.load(fileName: ".env");
   await _prosesSinyalFCM(message, "Latar Belakang (Background)");
@@ -106,16 +104,12 @@ void main() async {
     sound: true,
   );
 
-  // Mendaftarkan Handler Notifikasi FCM (Background & Terminated)
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  // Mendaftarkan Handler Notifikasi FCM (Foreground)
   FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
     await _prosesSinyalFCM(message, "Layar Aktif (Foreground)");
   });
 
-  // Inisialisasi Service Background agar standby menerima sinyal OS
-  await TrackingService.initializeService();
+  // HAPUS TrackingService.initializeService(); yang sebelumnya di sini
 
   runApp(const MyApp());
 }

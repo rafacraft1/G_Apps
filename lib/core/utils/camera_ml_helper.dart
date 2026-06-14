@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 class CameraMlHelper {
-  /// Mengonversi CameraImage (raw bytes streaming) ke InputImage (format ML Kit)
   static InputImage? inputImageFromCameraImage({
     required CameraImage image,
     required CameraDescription camera,
@@ -24,34 +24,82 @@ class CameraMlHelper {
       rotation = InputImageRotation.rotation90deg;
     }
 
-    if (rotation == null) {
-      return null;
-    }
+    if (rotation == null) return null;
 
-    // Mendapatkan format gambar dari kamera (NV21 untuk Android, BGRA8888 untuk iOS)
     final format = InputImageFormatValue.fromRawValue(image.format.raw);
+    if (format == null || image.planes.isEmpty) return null;
 
-    if (format == null ||
-        (Platform.isAndroid && format != InputImageFormat.nv21) ||
-        (Platform.isIOS && format != InputImageFormat.bgra8888)) {
-      return null;
+    if (Platform.isAndroid) {
+      // PERBAIKAN FINAL: ALGORITMA KONVERSI YUV_420_888 KE NV21
+      // Memastikan urutan byte Y, U, dan V tidak saling tindih (interleaved)
+
+      final WriteBuffer allBytes = WriteBuffer();
+
+      // Lapisan Y (Luminance/Kecerahan) adalah pesawat utama
+      final Plane yPlane = image.planes[0];
+      allBytes.putUint8List(yPlane.bytes);
+
+      // Lapisan U dan V (Chrominance/Warna)
+      // Pada YUV420_888, panjang byte U dan V mungkin terpisah (Pixel Stride > 1)
+      final Plane uPlane = image.planes[1];
+      final Plane vPlane = image.planes[2];
+
+      final int uvRowStride = uPlane.bytesPerRow;
+      final int uvPixelStride = uPlane.bytesPerPixel ?? 1;
+
+      // Konversi presisi agar sesuai dengan NV21:
+      // NV21 mengharapkan susunan byte: YYYY... VUVUVU...
+      if (uvPixelStride == 2) {
+        // Jika format sudah interleaved (sebagian besar HP Android modern)
+        allBytes.putUint8List(vPlane.bytes);
+      } else {
+        // Jika format terpisah (Planar murni), kita harus menggabungkannya manual
+        int halfWidth = image.width ~/ 2;
+        int halfHeight = image.height ~/ 2;
+
+        for (int row = 0; row < halfHeight; row++) {
+          for (int col = 0; col < halfWidth; col++) {
+            // Masukkan nilai V lalu U (Karena NV21 = Y + VU)
+            int vIndex = row * vPlane.bytesPerRow + col * uvPixelStride;
+            int uIndex = row * uPlane.bytesPerRow + col * uvPixelStride;
+
+            // Agar tidak out-of-bounds
+            if (vIndex < vPlane.bytes.length && uIndex < uPlane.bytes.length) {
+              allBytes.putUint8(vPlane.bytes[vIndex]);
+              allBytes.putUint8(uPlane.bytes[uIndex]);
+            }
+          }
+        }
+      }
+
+      final bytes = allBytes.done().buffer.asUint8List();
+
+      return InputImage.fromBytes(
+        bytes: bytes,
+        metadata: InputImageMetadata(
+          size: Size(image.width.toDouble(), image.height.toDouble()),
+          rotation: rotation,
+          format: InputImageFormat.nv21, // WAJIB DIPAKSA KE NV21
+          bytesPerRow: yPlane.bytesPerRow,
+        ),
+      );
+    } else {
+      // UNTUK iOS (Bawaannya sudah BGRA8888, aman untuk digabung langsung)
+      final WriteBuffer allBytes = WriteBuffer();
+      for (final Plane plane in image.planes) {
+        allBytes.putUint8List(plane.bytes);
+      }
+      final bytes = allBytes.done().buffer.asUint8List();
+
+      return InputImage.fromBytes(
+        bytes: bytes,
+        metadata: InputImageMetadata(
+          size: Size(image.width.toDouble(), image.height.toDouble()),
+          rotation: rotation,
+          format: format,
+          bytesPerRow: image.planes[0].bytesPerRow,
+        ),
+      );
     }
-
-    if (image.planes.isEmpty) {
-      return null;
-    }
-
-    final plane = image.planes.first;
-
-    // Mengembalikan objek InputImage agar bisa dianalisa wajahnya secara Live
-    return InputImage.fromBytes(
-      bytes: plane.bytes,
-      metadata: InputImageMetadata(
-        size: Size(image.width.toDouble(), image.height.toDouble()),
-        rotation: rotation,
-        format: format,
-        bytesPerRow: plane.bytesPerRow,
-      ),
-    );
   }
 }

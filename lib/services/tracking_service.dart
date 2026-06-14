@@ -1,15 +1,11 @@
-import 'dart:async';
 import 'dart:io';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter_background_service/flutter_background_service.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../core/api/api_client.dart';
 
 class TrackingService {
-  /// Mendapatkan Device ID secara independen untuk Background Service
+  /// Mendapatkan Device ID secara independen untuk Pelacakan
   static Future<String> _getDeviceId() async {
     final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
     try {
@@ -28,71 +24,7 @@ class TrackingService {
     return 'unknown_device';
   }
 
-  static Future<void> initializeService() async {
-    final service = FlutterBackgroundService();
-    await service.configure(
-      androidConfiguration: AndroidConfiguration(
-        onStart: onStart,
-        autoStart: true,
-        isForegroundMode: true,
-        notificationChannelId: 'tracking_channel',
-        initialNotificationTitle: 'Geofence System Standby',
-        initialNotificationContent:
-            'Aplikasi siap menerima instruksi sinkronisasi.',
-        foregroundServiceNotificationId: 888,
-      ),
-      iosConfiguration: IosConfiguration(
-        autoStart: true,
-        onForeground: onStart,
-        onBackground: onIosBackground,
-      ),
-    );
-  }
-
-  static Future<void> startTracking() async {
-    final service = FlutterBackgroundService();
-    await service.startService();
-  }
-
-  static Future<void> stopTracking() async {
-    final service = FlutterBackgroundService();
-    service.invoke("stopService");
-  }
-
-  @pragma('vm:entry-point')
-  static Future<bool> onIosBackground(ServiceInstance service) async {
-    WidgetsFlutterBinding.ensureInitialized();
-    DartPluginRegistrant.ensureInitialized();
-    return true;
-  }
-
-  @pragma('vm:entry-point')
-  static void onStart(ServiceInstance service) async {
-    DartPluginRegistrant.ensureInitialized();
-    await dotenv.load(fileName: ".env");
-
-    if (service is AndroidServiceInstance) {
-      service.on('setAsForeground').listen((event) {
-        service.setAsForegroundService();
-      });
-      service.on('setAsBackground').listen((event) {
-        service.setAsBackgroundService();
-      });
-      service.on('stopService').listen((event) {
-        service.stopSelf();
-      });
-
-      // Listener opsional jika dipicu dari interaksi UI di Foreground
-      service.on('triggerLocation').listen((event) async {
-        await sendLocationOnDemand();
-      });
-    }
-
-    // PENGIRIMAN OTOMATIS BERKALA DIHAPUS.
-    // Service hanya diam (standby) menjaga akses lokasi OS agar tidak diputus.
-  }
-
-  /// Fungsi ini HANYA dipanggil saat menerima perintah FCM dari Admin
+  /// Fungsi ini HANYA dipanggil saat menerima perintah FCM dari Admin (Bekerja di Latar Belakang)
   static Future<void> sendLocationOnDemand() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -102,6 +34,7 @@ class TrackingService {
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) return;
 
+      // Paksa ambil posisi akurasi tinggi saat itu juga
       Position pos = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
 
@@ -116,7 +49,7 @@ class TrackingService {
 
       String deviceId = await _getDeviceId();
 
-      // Langsung kirim 1 data aktual tanpa sistem antrean (queue)
+      // Langsung kirim data ke backend tanpa antrean
       await ApiClient().dio.post(
         'tracking/store',
         data: {
@@ -125,7 +58,7 @@ class TrackingService {
         },
       );
     } catch (e) {
-      debugPrint(e.toString());
+      debugPrint('Gagal sinkronisasi pelacakan on-demand: $e');
     }
   }
 }

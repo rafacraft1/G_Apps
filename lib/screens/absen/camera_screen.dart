@@ -106,9 +106,11 @@ class _CameraScreenState extends State<CameraScreen>
         orElse: () => cameras.first,
       );
 
+      // PERBAIKAN: imageFormatGroup NV21 dihapus agar hardware kamera Xiaomi tidak crash (Error 4/5)
+      // Resolusi dinaikkan menjadi High agar akurasi pemindaian ML Kit lebih maksimal
       _controller = CameraController(
         _kameraDepan!,
-        ResolutionPreset.medium,
+        ResolutionPreset.high,
         enableAudio: false,
       );
 

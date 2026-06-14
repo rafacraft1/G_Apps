@@ -76,6 +76,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _updateFCMToken() async {
     try {
+      // Cek apakah user memiliki token aktif sebelum hit API untuk mencegah error 401
+      String? token = await SecureStorageHelper.getToken();
+      if (token == null || token.isEmpty) return;
+
       String? fcmToken = await FirebaseMessaging.instance.getToken();
       if (fcmToken != null) {
         FormData formData = FormData.fromMap({'fcm_token': fcmToken});
@@ -91,9 +95,8 @@ class _HomeScreenState extends State<HomeScreen> {
     String? foto = await SecureStorageHelper.getFotoProfile();
     String? kelas = await SecureStorageHelper.getUserKelas();
 
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
+
     setState(() {
       _namaSiswa = nama ?? 'Siswa';
       _namaKelas = kelas ?? 'Siswa Aktif';
@@ -102,9 +105,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refreshSemuaData() async {
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
+
     setState(() {
       _isMemuatWaktu = true;
       _isMemuatLokasi = true;
@@ -113,9 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final serverData = await ServerRepository.getServerData();
 
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       if (serverData != null) {
         setState(() {
@@ -126,7 +126,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
           _jamMasukServer = serverData['jam_masuk'] ?? "07:00:00";
           _jamPulangServer = serverData['jam_pulang'] ?? "15:00:00";
-          _jamBukaServer = serverData['pengaturan']['jam_buka'] ?? "06:00:00";
+
+          // PERBAIKAN BUG NULL SAFETY DI SINI
+          Map<String, dynamic>? pengaturan =
+              serverData['pengaturan'] as Map<String, dynamic>?;
+          _jamBukaServer = pengaturan?['jam_buka'] ?? "06:00:00";
 
           _latSekolah =
               double.tryParse(serverData['lat_sekolah']?.toString() ?? '0.0') ??
@@ -151,28 +155,26 @@ class _HomeScreenState extends State<HomeScreen> {
           final absenHariIni =
               await Provider.of<AbsensiProvider>(context, listen: false)
                   .cekAbsenHariIni(tanggalHariIni);
-          if (!mounted) {
-            return;
-          }
+          if (!mounted) return;
+
           setState(() => _dataAbsenHariIni = absenHariIni);
         } catch (e) {
-          if (e.toString() == 'sesi_habis') {
+          // Tangani jika sesi API benar-benar habis
+          if (e.toString().contains('sesi_habis') ||
+              e.toString().contains('401')) {
             _prosesLogoutExpired();
           }
         }
       }
     } catch (e) {
       debugPrint('Error fetch waktu server: $e');
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() => _isMemuatWaktu = false);
     }
 
     await _updateLokasiJarak();
-    if (!mounted) {
-      return;
-    }
+
+    if (!mounted) return;
     Provider.of<PengumumanProvider>(context, listen: false).fetchPengumuman();
   }
 
@@ -198,9 +200,7 @@ class _HomeScreenState extends State<HomeScreen> {
       Position pos = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
 
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       double jarak = Geolocator.distanceBetween(
           pos.latitude, pos.longitude, _latSekolah, _lonSekolah);
@@ -210,9 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } catch (e) {
       debugPrint('Error lokasi: $e');
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() {
         _jarakMeter = null;
         _isMemuatLokasi = false;
@@ -222,9 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _prosesLogoutExpired() async {
     await Provider.of<AuthProvider>(context, listen: false).logout();
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -462,9 +458,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           await Provider.of<AuthProvider>(context,
                                   listen: false)
                               .logout();
-                          if (!context.mounted) {
-                            return;
-                          }
+                          if (!context.mounted) return;
+
                           Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(
