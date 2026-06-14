@@ -9,19 +9,27 @@ import 'pdf_viewer_screen.dart';
 class PengumumanList extends StatelessWidget {
   const PengumumanList({super.key});
 
+  // TAHAP 3: Static cache untuk Base URL Pengumuman
+  static String? _cachedHost;
+
   String _getValidFileUrl(String? fileName) {
     if (fileName == null || fileName.isEmpty) return '';
     if (fileName.startsWith('http')) return fileName;
-    try {
-      String baseUrlEnv = dotenv.env['BASE_URL'] ?? '';
-      if (baseUrlEnv.isEmpty) return fileName;
-      Uri apiUri = Uri.parse(baseUrlEnv);
-      String validHost =
-          '${apiUri.scheme}://${apiUri.host}${apiUri.hasPort ? ':${apiUri.port}' : ''}';
-      return '$validHost/uploads/pengumuman/$fileName';
-    } catch (e) {
-      return fileName;
+
+    // TAHAP 3: Hanya melakukan parsing .env satu kali saja
+    if (_cachedHost == null) {
+      try {
+        String baseUrlEnv = dotenv.env['BASE_URL'] ?? '';
+        if (baseUrlEnv.isEmpty) return fileName;
+        Uri apiUri = Uri.parse(baseUrlEnv);
+        _cachedHost =
+            '${apiUri.scheme}://${apiUri.host}${apiUri.hasPort ? ':${apiUri.port}' : ''}';
+      } catch (e) {
+        return fileName;
+      }
     }
+
+    return '$_cachedHost/uploads/pengumuman/$fileName';
   }
 
   bool _isImage(String filename) {
@@ -124,7 +132,6 @@ class PengumumanList extends StatelessWidget {
                       ),
                     ),
                   ),
-
                   Row(
                     children: [
                       Container(
@@ -172,7 +179,6 @@ class PengumumanList extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 20),
-
                   Text(
                     judul,
                     style: const TextStyle(
@@ -185,8 +191,6 @@ class PengumumanList extends StatelessWidget {
                     padding: EdgeInsets.symmetric(vertical: 16),
                     child: Divider(height: 1, color: Color(0xFFEEEEEE)),
                   ),
-
-                  // LAMPIRAN INTERAKTIF
                   if (namaLampiran != null && namaLampiran.isNotEmpty)
                     _isImage(namaLampiran)
                         ? GestureDetector(
@@ -287,7 +291,6 @@ class PengumumanList extends StatelessWidget {
                               ),
                             ),
                           ),
-
                   Expanded(
                     child: ListView(
                       controller: controller,
@@ -305,7 +308,6 @@ class PengumumanList extends StatelessWidget {
                       ],
                     ),
                   ),
-
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.only(bottom: 24, top: 12),

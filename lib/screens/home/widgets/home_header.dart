@@ -7,7 +7,6 @@ class HomeHeader extends StatelessWidget {
   final String namaSiswa;
   final String namaKelas;
   final String? fotoUrl;
-  // PERUBAHAN TAHAP 1: Menggunakan ValueNotifier agar hanya jam yang ter-update
   final ValueNotifier<DateTime?> waktuServerNotifier;
   final VoidCallback onRiwayatTap;
   final VoidCallback onLogoutTap;
@@ -23,6 +22,9 @@ class HomeHeader extends StatelessWidget {
     required this.onLogoutTap,
     required this.onRefreshProfile,
   });
+
+  // TAHAP 3: Variabel static untuk menyimpan URL agar tidak diproses berulang kali
+  static String? _cachedHost;
 
   String _formatWaktuLengkap(DateTime dt) {
     List<String> hari = [
@@ -60,16 +62,22 @@ class HomeHeader extends StatelessWidget {
   String _getValidFotoUrl(String? fileName) {
     if (fileName == null || fileName.isEmpty) return '';
     if (fileName.startsWith('http')) return fileName;
-    try {
-      String baseUrlEnv = dotenv.env['BASE_URL'] ?? '';
-      if (baseUrlEnv.isEmpty) return fileName;
-      Uri apiUri = Uri.parse(baseUrlEnv);
-      String validHost =
-          '${apiUri.scheme}://${apiUri.host}${apiUri.hasPort ? ':${apiUri.port}' : ''}';
-      return '$validHost/uploads/siswa/$fileName';
-    } catch (e) {
-      return fileName;
+
+    // TAHAP 3: Cek apakah host sudah tersimpan di memori (cache)
+    if (_cachedHost == null) {
+      try {
+        String baseUrlEnv = dotenv.env['BASE_URL'] ?? '';
+        if (baseUrlEnv.isEmpty) return fileName;
+        Uri apiUri = Uri.parse(baseUrlEnv);
+        _cachedHost =
+            '${apiUri.scheme}://${apiUri.host}${apiUri.hasPort ? ':${apiUri.port}' : ''}';
+      } catch (e) {
+        return fileName;
+      }
     }
+
+    // Langsung gabungkan dengan cache, jauh lebih cepat!
+    return '$_cachedHost/uploads/siswa/$fileName';
   }
 
   @override
@@ -99,7 +107,6 @@ class HomeHeader extends StatelessWidget {
                         color: Colors.black.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      // PERUBAHAN TAHAP 1: Widget ini sekarang mendengarkan detak waktu mandiri
                       child: ValueListenableBuilder<DateTime?>(
                         valueListenable: waktuServerNotifier,
                         builder: (context, waktu, child) {
