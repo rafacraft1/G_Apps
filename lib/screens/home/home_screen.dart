@@ -62,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _updateFCMToken();
     _refreshSemuaData();
 
+    // Timer ini berdetak setiap 1 detik untuk mengupdate waktu secara lokal
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_waktuServerNotifier.value != null) {
         _waktuServerNotifier.value =
@@ -182,9 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _updateLokasiJarak() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        throw Exception('GPS tidak aktif');
-      }
+      if (!serviceEnabled) throw Exception('GPS tidak aktif');
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -205,6 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       double jarak = Geolocator.distanceBetween(
           pos.latitude, pos.longitude, _latSekolah, _lonSekolah);
+
       setState(() {
         _jarakMeter = jarak;
         _isMemuatLokasi = false;
@@ -228,6 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
         (route) => false);
   }
 
+  // Fungsi validasi super ketat ini akan dijalankan SETIAP DETIK
   Map<String, dynamic> _getKonfigurasiAbsen(DateTime? waktuSaatIni) {
     String statusHariIni = 'Memuat...';
     Color warnaStatus = Colors.grey;
@@ -250,7 +251,6 @@ class _HomeScreenState extends State<HomeScreen> {
             int.parse(jp[0]),
             int.parse(jp[1]),
             int.parse(jp[2]));
-
         DateTime batasAwalMasuk = DateTime(
             waktuSaatIni.year,
             waktuSaatIni.month,
@@ -285,7 +285,7 @@ class _HomeScreenState extends State<HomeScreen> {
             statusHariIni = 'Belum Absen';
             warnaStatus = Colors.orange;
 
-            // 1. Cek Jam Buka
+            // Evaluasi Hierarki Validasi: Waktu -> GPS Aktif -> Radius
             if (waktuSaatIni.isBefore(batasAwalMasuk)) {
               labelTombol = 'Belum Waktunya';
               subLabel =
@@ -293,25 +293,19 @@ class _HomeScreenState extends State<HomeScreen> {
               warnaTombol = Colors.grey;
               iconTombol = Icons.lock;
               isTombolDisable = true;
-            }
-            // 2. Cek apakah GPS gagal didapatkan
-            else if (_jarakMeter == null) {
+            } else if (_jarakMeter == null) {
               labelTombol = 'Lokasi Tidak Valid';
               subLabel = 'Pastikan GPS perangkat Anda aktif';
               warnaTombol = Colors.red;
               iconTombol = Icons.gps_off;
               isTombolDisable = true;
-            }
-            // 3. Cek Radius (Jika diluar batas)
-            else if (_jarakMeter! > _radius) {
-              labelTombol = 'Di Luar Zona Lokasi';
-              subLabel = 'Tidak bisa absen';
+            } else if (_jarakMeter! > _radius) {
+              labelTombol = 'Di Luar Zona';
+              subLabel = 'Tidak bisa absen diluar zona lokasi absen';
               warnaTombol = Colors.redAccent;
               iconTombol = Icons.location_off;
               isTombolDisable = true;
-            }
-            // 4. Syarat Terpenuhi
-            else {
+            } else {
               labelTombol = 'Absen Masuk';
               subLabel = 'Ketuk untuk mulai';
               warnaTombol = Colors.blue;
@@ -378,25 +372,19 @@ class _HomeScreenState extends State<HomeScreen> {
               subLabel = 'Batas absen 23:00';
               warnaTombol = Colors.red;
               isTombolDisable = true;
-            }
-            // 1. Cek apakah GPS gagal didapatkan (Saat Pulang)
-            else if (_jarakMeter == null) {
+            } else if (_jarakMeter == null) {
               labelTombol = 'Lokasi Tidak Valid';
               subLabel = 'Pastikan GPS perangkat Anda aktif';
               warnaTombol = Colors.red;
               iconTombol = Icons.gps_off;
               isTombolDisable = true;
-            }
-            // 2. Cek Radius Pulang (Jika diluar batas)
-            else if (_jarakMeter! > _radius) {
-              labelTombol = 'Di Luar Zona';
-              subLabel = 'Tidak bisa absen diluar zona lokasi absen';
+            } else if (_jarakMeter! > _radius) {
+              labelTombol = 'Tidak Bisa Absen';
+              subLabel = 'Di Luar Zona Absen';
               warnaTombol = Colors.redAccent;
               iconTombol = Icons.location_off;
               isTombolDisable = true;
-            }
-            // 3. Syarat Pulang Terpenuhi
-            else {
+            } else {
               labelTombol = 'Absen Pulang';
               subLabel = 'Ketuk untuk pulang';
               warnaTombol = Colors.orange;
@@ -445,7 +433,7 @@ class _HomeScreenState extends State<HomeScreen> {
           BoxShadow(
               color: Colors.black.withOpacity(0.04),
               blurRadius: 10,
-              offset: const Offset(0, 4)),
+              offset: const Offset(0, 4))
         ],
       ),
       child: Material(
@@ -484,8 +472,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final config = _getKonfigurasiAbsen(_waktuServerNotifier.value);
-
     return Scaffold(
       backgroundColor: Colors.grey[50],
       body: RefreshIndicator(
@@ -527,17 +513,23 @@ class _HomeScreenState extends State<HomeScreen> {
                         bottom: -120,
                         left: 20,
                         right: 20,
-                        child: StatusCard(
-                          isMemuat: _isMemuatWaktu,
-                          statusHadir: config['statusHariIni'],
-                          statusHadirColor: config['warnaStatus'],
-                          waktuServer: _waktuServerNotifier.value,
-                          jamMasukServer: _jamMasukServer,
-                          jamPulangServer: _jamPulangServer,
-                          jarakMeter: _jarakMeter,
-                          isMemuatLokasi: _isMemuatLokasi,
-                          namaZona: _namaZona,
-                        ),
+                        // PERBAIKAN: Dibungkus Notifier agar UI Card terupdate REAL TIME
+                        child: ValueListenableBuilder<DateTime?>(
+                            valueListenable: _waktuServerNotifier,
+                            builder: (context, waktuSaatIni, child) {
+                              final config = _getKonfigurasiAbsen(waktuSaatIni);
+                              return StatusCard(
+                                isMemuat: _isMemuatWaktu,
+                                statusHadir: config['statusHariIni'],
+                                statusHadirColor: config['warnaStatus'],
+                                waktuServer: waktuSaatIni,
+                                jamMasukServer: _jamMasukServer,
+                                jamPulangServer: _jamPulangServer,
+                                jarakMeter: _jarakMeter,
+                                isMemuatLokasi: _isMemuatLokasi,
+                                namaZona: _namaZona,
+                              );
+                            }),
                       ),
                     ],
                   ),
@@ -560,32 +552,30 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: _buildActionMenu(
-                            context: context,
-                            title: 'Ajukan Izin',
-                            subtitle: 'Sakit/Keperluan',
-                            icon: Icons.edit_document,
-                            color: Colors.orange,
-                            onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const AjukanIzinScreen())),
-                          ),
-                        ),
+                            child: _buildActionMenu(
+                                context: context,
+                                title: 'Ajukan Izin',
+                                subtitle: 'Sakit/Keperluan',
+                                icon: Icons.edit_document,
+                                color: Colors.orange,
+                                onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) =>
+                                            const AjukanIzinScreen())))),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: _buildActionMenu(
-                            context: context,
-                            title: 'Status Izin',
-                            subtitle: 'Riwayat Pengajuan',
-                            icon: Icons.assignment_turned_in_rounded,
-                            color: Colors.blue,
-                            onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const RiwayatIzinScreen())),
-                          ),
-                        ),
+                            child: _buildActionMenu(
+                                context: context,
+                                title: 'Status Izin',
+                                subtitle: 'Riwayat Pengajuan',
+                                icon: Icons.assignment_turned_in_rounded,
+                                color: Colors.blue,
+                                onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) =>
+                                            const RiwayatIzinScreen())))),
                       ],
                     ),
                     const SizedBox(height: 32),
@@ -604,54 +594,61 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: SizedBox(
-          width: double.infinity,
-          height: 65,
-          child: ElevatedButton(
-            onPressed: config['isTombolDisable']
-                ? null
-                : () async {
-                    await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => CameraScreen(
-                                  tipeAbsen: config['tipeAbsen'],
-                                  latSekolah: _latSekolah,
-                                  lonSekolah: _lonSekolah,
-                                  radius: _radius,
-                                )));
-                    _refreshSemuaData();
-                  },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: config['warnaTombol'],
-              disabledBackgroundColor:
-                  (config['warnaTombol'] as Color).withOpacity(0.8),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(config['iconTombol'], color: Colors.white),
-                const SizedBox(width: 12),
-                Column(
+      floatingActionButton: ValueListenableBuilder<DateTime?>(
+        valueListenable: _waktuServerNotifier,
+        builder: (context, waktuSaatIni, child) {
+          final config = _getKonfigurasiAbsen(waktuSaatIni);
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: SizedBox(
+              width: double.infinity,
+              height: 65,
+              child: ElevatedButton(
+                onPressed: config['isTombolDisable']
+                    ? null
+                    : () async {
+                        await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => CameraScreen(
+                                      tipeAbsen: config['tipeAbsen'],
+                                      latSekolah: _latSekolah,
+                                      lonSekolah: _lonSekolah,
+                                      radius: _radius,
+                                    )));
+                        _refreshSemuaData();
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: config['warnaTombol'],
+                  disabledBackgroundColor:
+                      (config['warnaTombol'] as Color).withOpacity(0.8),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                ),
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(config['labelTombol'],
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, color: Colors.white)),
-                    Text(config['subLabel'],
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.white70)),
+                    Icon(config['iconTombol'], color: Colors.white),
+                    const SizedBox(width: 12),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(config['labelTombol'],
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white)),
+                        Text(config['subLabel'],
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.white70)),
+                      ],
+                    )
                   ],
-                )
-              ],
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
