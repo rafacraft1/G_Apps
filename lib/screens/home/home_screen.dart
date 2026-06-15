@@ -50,7 +50,6 @@ class _HomeScreenState extends State<HomeScreen> {
   double _lonSekolah = 0.0;
   double _radius = 50.0;
 
-  // PENAMBAHAN: Variabel untuk menyimpan Nama Zona
   String _namaZona = 'Area Sekolah';
 
   double? _jarakMeter;
@@ -144,7 +143,6 @@ class _HomeScreenState extends State<HomeScreen> {
               double.tryParse(serverData['radius']?.toString() ?? '50.0') ??
                   50.0;
 
-          // PENAMBAHAN: Menangkap nama_zona dari JSON Response (Bisa ganti key "nama_zona" sesuai di BE)
           _namaZona = serverData['nama_zona'] ?? 'Area Sekolah';
 
           _isMemuatWaktu = false;
@@ -497,7 +495,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           jamPulangServer: _jamPulangServer,
                           jarakMeter: _jarakMeter,
                           isMemuatLokasi: _isMemuatLokasi,
-                          // PENAMBAHAN: Mengirim namaZona ke StatusCard
                           namaZona: _namaZona,
                         ),
                       ),

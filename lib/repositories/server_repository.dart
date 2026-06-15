@@ -9,7 +9,8 @@ class ServerRepository {
       if (response.data != null &&
           (response.data['status'] == 200 ||
               response.data['status'] == 'success')) {
-        var payload = response.data['data'];
+        // PERBAIKAN: Gunakan fallback ke response.data jika key ['data'] tidak ada (mendukung flat JSON)
+        var payload = response.data['data'] ?? response.data;
 
         return {
           'waktu': DateTime.parse(payload['waktu']),
@@ -22,7 +23,6 @@ class ServerRepository {
           'lon_sekolah':
               double.tryParse(payload['lon_sekolah'].toString()) ?? 0.0,
           'radius': double.tryParse(payload['radius'].toString()) ?? 50.0,
-          // WAJIB DITAMBAHKAN: Agar nama_zona dari WaktuApi.php bisa ditangkap oleh Flutter
           'nama_zona': payload['nama_zona'] ?? 'Area Sekolah',
         };
       }
