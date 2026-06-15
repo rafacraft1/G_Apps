@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:geolocator/geolocator.dart';
@@ -38,25 +39,24 @@ class TrackingService {
       Position pos = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
 
-      Map<String, dynamic> currentLoc = {
-        'lat': pos.latitude,
-        'lng': pos.longitude,
-        'accuracy': pos.accuracy,
-        'is_mock': pos.isMocked ? 1 : 0,
-        'waktu': DateTime.now().toLocal().toString().split('.')[0],
-        'tipe': 'trigger'
-      };
-
       String deviceId = await _getDeviceId();
 
-      // Langsung kirim data ke backend tanpa antrean
+      // Langsung kirim data ke backend sesuai format CI4 (Flat Data + Device ID Header)
       await ApiClient().dio.post(
-        'tracking/store',
-        data: {
-          'device_id': deviceId,
-          'locations': [currentLoc]
-        },
-      );
+            'tracking/updateLokasi',
+            data: {
+              'latitude': pos.latitude,
+              'longitude': pos.longitude,
+              'accuracy': pos.accuracy,
+              'is_mock': pos.isMocked ? 1 : 0,
+              'device_timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+            },
+            options: Options(
+              headers: {
+                'X-Device-ID': deviceId,
+              },
+            ),
+          );
     } catch (e) {
       debugPrint('Gagal sinkronisasi pelacakan on-demand: $e');
     }
