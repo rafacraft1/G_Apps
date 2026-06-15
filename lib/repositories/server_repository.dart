@@ -9,7 +9,6 @@ class ServerRepository {
       if (response.data != null &&
           (response.data['status'] == 200 ||
               response.data['status'] == 'success')) {
-        // PERBAIKAN: Gunakan fallback ke response.data jika key ['data'] tidak ada (mendukung flat JSON)
         var payload = response.data['data'] ?? response.data;
 
         return {
@@ -24,6 +23,8 @@ class ServerRepository {
               double.tryParse(payload['lon_sekolah'].toString()) ?? 0.0,
           'radius': double.tryParse(payload['radius'].toString()) ?? 50.0,
           'nama_zona': payload['nama_zona'] ?? 'Area Sekolah',
+          // PERBAIKAN FATAL: Parsing data 'pengaturan' agar jam buka absen terbaca oleh HomeScreen
+          'pengaturan': payload['pengaturan'] ?? {},
         };
       }
     } catch (e) {

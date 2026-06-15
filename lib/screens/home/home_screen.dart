@@ -284,6 +284,8 @@ class _HomeScreenState extends State<HomeScreen> {
           } else {
             statusHariIni = 'Belum Absen';
             warnaStatus = Colors.orange;
+
+            // 1. Cek Jam Buka
             if (waktuSaatIni.isBefore(batasAwalMasuk)) {
               labelTombol = 'Belum Waktunya';
               subLabel =
@@ -291,11 +293,30 @@ class _HomeScreenState extends State<HomeScreen> {
               warnaTombol = Colors.grey;
               iconTombol = Icons.lock;
               isTombolDisable = true;
-            } else {
+            }
+            // 2. Cek apakah GPS gagal didapatkan
+            else if (_jarakMeter == null) {
+              labelTombol = 'Lokasi Tidak Valid';
+              subLabel = 'Pastikan GPS perangkat Anda aktif';
+              warnaTombol = Colors.red;
+              iconTombol = Icons.gps_off;
+              isTombolDisable = true;
+            }
+            // 3. Cek Radius (Jika diluar batas)
+            else if (_jarakMeter! > _radius) {
+              labelTombol = 'Di Luar Zona Lokasi';
+              subLabel = 'Tidak bisa absen';
+              warnaTombol = Colors.redAccent;
+              iconTombol = Icons.location_off;
+              isTombolDisable = true;
+            }
+            // 4. Syarat Terpenuhi
+            else {
               labelTombol = 'Absen Masuk';
               subLabel = 'Ketuk untuk mulai';
               warnaTombol = Colors.blue;
               iconTombol = Icons.login;
+              isTombolDisable = false;
             }
           }
         } else {
@@ -344,6 +365,7 @@ class _HomeScreenState extends State<HomeScreen> {
             tipeAbsen = 'pulang';
             statusHariIni = 'Belum Absen Pulang';
             warnaStatus = Colors.blue;
+
             if (waktuSaatIni.isBefore(jamPulang)) {
               labelTombol = 'Belum Jam Pulang';
               subLabel =
@@ -356,11 +378,30 @@ class _HomeScreenState extends State<HomeScreen> {
               subLabel = 'Batas absen 23:00';
               warnaTombol = Colors.red;
               isTombolDisable = true;
-            } else {
+            }
+            // 1. Cek apakah GPS gagal didapatkan (Saat Pulang)
+            else if (_jarakMeter == null) {
+              labelTombol = 'Lokasi Tidak Valid';
+              subLabel = 'Pastikan GPS perangkat Anda aktif';
+              warnaTombol = Colors.red;
+              iconTombol = Icons.gps_off;
+              isTombolDisable = true;
+            }
+            // 2. Cek Radius Pulang (Jika diluar batas)
+            else if (_jarakMeter! > _radius) {
+              labelTombol = 'Di Luar Zona';
+              subLabel = 'Tidak bisa absen diluar zona lokasi absen';
+              warnaTombol = Colors.redAccent;
+              iconTombol = Icons.location_off;
+              isTombolDisable = true;
+            }
+            // 3. Syarat Pulang Terpenuhi
+            else {
               labelTombol = 'Absen Pulang';
               subLabel = 'Ketuk untuk pulang';
               warnaTombol = Colors.orange;
               iconTombol = Icons.logout;
+              isTombolDisable = false;
             }
           } else {
             statusHariIni = 'Hadir';
