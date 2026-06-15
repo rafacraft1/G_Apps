@@ -1,8 +1,8 @@
 name: geofence_app
-description: "A new Flutter project."
+description: "Aplikasi Presensi SMKN 1 Tegalbuleud"
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 2.0.1
 
 environment:
   sdk: '>=3.3.4 <4.0.0'
