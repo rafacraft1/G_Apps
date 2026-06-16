@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Diperlukan untuk orientasi layar
 import 'package:geolocator/geolocator.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:lottie/lottie.dart';
@@ -99,6 +100,9 @@ class _CameraScreenState extends State<CameraScreen>
           enableAudio: false);
       await _controller!.initialize();
 
+      // Mengunci layar agar tidak berubah ke landscape yang membuat UI berantakan
+      await _controller!.lockCaptureOrientation(DeviceOrientation.portraitUp);
+
       if (mounted) {
         setState(() => _isCameraInitialized = true);
       }
@@ -139,7 +143,6 @@ class _CameraScreenState extends State<CameraScreen>
       }
 
       await _initCameraOnly();
-
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -413,20 +416,25 @@ class _CameraScreenState extends State<CameraScreen>
                           ? Stack(
                               fit: StackFit.expand,
                               children: [
-                                SizedBox(
-                                    width: double.infinity,
-                                    height: double.infinity,
-                                    child: FittedBox(
-                                        fit: BoxFit.cover,
-                                        child: SizedBox(
-                                            width: 100,
-                                            height: 100 *
-                                                _controller!.value.aspectRatio,
-                                            child:
-                                                CameraPreview(_controller!)))),
+                                // Perbaikan kamera terdistorsi / gepeng
+                                Transform.scale(
+                                  scale: _controller!.value.aspectRatio < 1.0
+                                      ? 1.0 / _controller!.value.aspectRatio
+                                      : _controller!.value.aspectRatio,
+                                  child: Center(
+                                    child: AspectRatio(
+                                      aspectRatio:
+                                          _controller!.value.aspectRatio,
+                                      child: CameraPreview(_controller!),
+                                    ),
+                                  ),
+                                ),
+                                // Overlay / Marking Wajah
                                 Positioned.fill(
-                                    child: CustomPaint(
-                                        painter: FaceOverlayPainter())),
+                                  child: CustomPaint(
+                                    painter: FaceOverlayPainter(),
+                                  ),
+                                ),
                               ],
                             )
                           : const Center(
