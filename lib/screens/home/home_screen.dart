@@ -228,7 +228,6 @@ class _HomeScreenState extends State<HomeScreen> {
         (route) => false);
   }
 
-  // Fungsi validasi super ketat ini akan dijalankan SETIAP DETIK
   Map<String, dynamic> _getKonfigurasiAbsen(DateTime? waktuSaatIni) {
     String statusHariIni = 'Memuat...';
     Color warnaStatus = Colors.grey;
@@ -284,8 +283,6 @@ class _HomeScreenState extends State<HomeScreen> {
           } else {
             statusHariIni = 'Belum Absen';
             warnaStatus = Colors.orange;
-
-            // Evaluasi Hierarki Validasi: Waktu -> GPS Aktif -> Radius
             if (waktuSaatIni.isBefore(batasAwalMasuk)) {
               labelTombol = 'Belum Waktunya';
               subLabel =
@@ -513,7 +510,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         bottom: -120,
                         left: 20,
                         right: 20,
-                        // PERBAIKAN: Dibungkus Notifier agar UI Card terupdate REAL TIME
                         child: ValueListenableBuilder<DateTime?>(
                             valueListenable: _waktuServerNotifier,
                             builder: (context, waktuSaatIni, child) {
@@ -615,13 +611,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                       latSekolah: _latSekolah,
                                       lonSekolah: _lonSekolah,
                                       radius: _radius,
+                                      namaZona: _namaZona,
                                     )));
                         _refreshSemuaData();
                       },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: config['warnaTombol'],
                   disabledBackgroundColor:
-                      (config['warnaTombol'] as Color).withOpacity(0.8),
+                      (config['warnaTombol'] as Color).withOpacity(0.9),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16)),
                 ),

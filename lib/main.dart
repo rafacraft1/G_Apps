@@ -109,8 +109,6 @@ void main() async {
     await _prosesSinyalFCM(message, "Layar Aktif (Foreground)");
   });
 
-  // HAPUS TrackingService.initializeService(); yang sebelumnya di sini
-
   runApp(const MyApp());
 }
 

@@ -105,7 +105,7 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Padding(
           padding: const EdgeInsets.only(bottom: 20),
           child: Text(
-            'Versi 1.0.0',
+            'Versi 2.0.1 - © 2026 Nurindra.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withOpacity(0.6),
