@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Diperlukan untuk orientasi layar
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:lottie/lottie.dart';
@@ -96,11 +96,11 @@ class _CameraScreenState extends State<CameraScreen>
           (c) => c.lensDirection == CameraLensDirection.front,
           orElse: () => cameras.first);
 
-      _controller = CameraController(_kameraDepan!, ResolutionPreset.medium,
+      // Kualitas High Definition (HD)
+      _controller = CameraController(_kameraDepan!, ResolutionPreset.high,
           enableAudio: false);
       await _controller!.initialize();
 
-      // Mengunci layar agar tidak berubah ke landscape yang membuat UI berantakan
       await _controller!.lockCaptureOrientation(DeviceOrientation.portraitUp);
 
       if (mounted) {
@@ -222,10 +222,9 @@ class _CameraScreenState extends State<CameraScreen>
       final inputImage = InputImage.fromFilePath(file.path);
       final faces = await _faceDetector!.processImage(inputImage);
 
+      // A. Wajah Kosong
       if (faces.isEmpty) {
-        if (fotoFile.existsSync()) {
-          fotoFile.deleteSync();
-        }
+        if (fotoFile.existsSync()) fotoFile.deleteSync();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: const Text(
@@ -244,9 +243,93 @@ class _CameraScreenState extends State<CameraScreen>
         return;
       }
 
+      // B. Wajah Lebih Dari Satu
+      if (faces.length > 1) {
+        if (fotoFile.existsSync()) fotoFile.deleteSync();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Text(
+                  'Terlalu banyak wajah! Pastikan hanya Anda di dalam frame.',
+                  style: TextStyle(color: Colors.white)),
+              backgroundColor: Colors.red[700],
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10))));
+          setState(() {
+            _isProcessingPhoto = false;
+            _statusPesan = "Pastikan hanya wajah Anda di kamera";
+          });
+          await _controller!.resumePreview();
+        }
+        return;
+      }
+
+      // C. Validasi Posisi Kordinat & Jarak Wajah
+      final face = faces.first;
+      final faceRect = face.boundingBox;
+
+      final bytes = await fotoFile.readAsBytes();
+      final decodedImage = await decodeImageFromList(bytes);
+      final double imgW = decodedImage.width.toDouble();
+      final double imgH = decodedImage.height.toDouble();
+
+      final double safeLeft = imgW * 0.20;
+      final double safeRight = imgW * 0.80;
+      final double safeTop = imgH * 0.20;
+      final double safeBottom = imgH * 0.80;
+
+      final double faceCenterX = faceRect.center.dx;
+      final double faceCenterY = faceRect.center.dy;
+
+      // Cek apakah posisi melenceng
+      if (faceCenterX < safeLeft ||
+          faceCenterX > safeRight ||
+          faceCenterY < safeTop ||
+          faceCenterY > safeBottom) {
+        if (fotoFile.existsSync()) fotoFile.deleteSync();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Text(
+                  'Wajah di luar bingkai! Posisikan wajah Anda tepat di tengah oval.',
+                  style: TextStyle(color: Colors.white)),
+              backgroundColor: Colors.orange[800],
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10))));
+          setState(() {
+            _isProcessingPhoto = false;
+            _statusPesan = "Posisikan wajah tepat di tengah bingkai";
+          });
+          await _controller!.resumePreview();
+        }
+        return;
+      }
+
+      // Cek apakah terlalu jauh (Ngezoom/Kecil)
+      if ((faceRect.width / imgW) < 0.25) {
+        if (fotoFile.existsSync()) fotoFile.deleteSync();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Text(
+                  'Wajah terlalu jauh! Dekatkan kamera ke wajah Anda.',
+                  style: TextStyle(color: Colors.white)),
+              backgroundColor: Colors.orange[800],
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10))));
+          setState(() {
+            _isProcessingPhoto = false;
+            _statusPesan = "Wajah terlalu jauh, dekatkan lagi";
+          });
+          await _controller!.resumePreview();
+        }
+        return;
+      }
+
+      // LOLOS VALIDASI
       if (mounted) {
         setState(
-            () => _statusPesan = "Wajah terdeteksi! Menyiapkan preview...");
+            () => _statusPesan = "Wajah terverifikasi! Menyiapkan preview...");
 
         PreviewBottomSheet.show(
           context: context,
@@ -272,7 +355,7 @@ class _CameraScreenState extends State<CameraScreen>
       if (mounted) {
         setState(() {
           _isProcessingPhoto = false;
-          _statusPesan = "Gagal mengambil foto. Coba lagi.";
+          _statusPesan = "Gagal memproses gambar. Coba lagi.";
         });
         await _controller!.resumePreview();
       }
@@ -402,6 +485,8 @@ class _CameraScreenState extends State<CameraScreen>
                               fontWeight: FontWeight.bold))
                     ])),
                 const Spacer(),
+
+                // AREA KAMERA KOTAK 1:1
                 AspectRatio(
                   aspectRatio: 1.0,
                   child: Container(
@@ -413,29 +498,37 @@ class _CameraScreenState extends State<CameraScreen>
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(29),
                       child: _isCameraInitialized && _controller != null
-                          ? Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                // Perbaikan kamera terdistorsi / gepeng
-                                Transform.scale(
-                                  scale: _controller!.value.aspectRatio < 1.0
-                                      ? 1.0 / _controller!.value.aspectRatio
-                                      : _controller!.value.aspectRatio,
-                                  child: Center(
-                                    child: AspectRatio(
-                                      aspectRatio:
-                                          _controller!.value.aspectRatio,
-                                      child: CameraPreview(_controller!),
+                          ? LayoutBuilder(
+                              builder: (context, constraints) {
+                                // 1. Ambil rasio lensa (Misal 9:16 = 0.56)
+                                double ratio = _controller!.value.aspectRatio;
+                                if (ratio > 1.0) ratio = 1.0 / ratio;
+
+                                return Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    // 2. KAMERA 100% PERFECT CROP ANTI-GEPENG
+                                    OverflowBox(
+                                      alignment: Alignment.center,
+                                      maxWidth: double.infinity,
+                                      maxHeight: double.infinity,
+                                      child: SizedBox(
+                                        // Lebar di-set mengikuti kotak, tinggi dibiarkan jebol ke atas/bawah secara proporsional
+                                        width: constraints.maxWidth,
+                                        height: constraints.maxWidth / ratio,
+                                        child: CameraPreview(_controller!),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                                // Overlay / Marking Wajah
-                                Positioned.fill(
-                                  child: CustomPaint(
-                                    painter: FaceOverlayPainter(),
-                                  ),
-                                ),
-                              ],
+
+                                    // 3. PANDUAN BINGKAI WAJAH
+                                    Positioned.fill(
+                                      child: CustomPaint(
+                                        painter: FaceOverlayPainter(),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             )
                           : const Center(
                               child: Text('Memuat Lensa...',
@@ -443,6 +536,7 @@ class _CameraScreenState extends State<CameraScreen>
                     ),
                   ),
                 ),
+
                 const Spacer(),
                 const Text('Silakan tekan tombol untuk mengambil foto.',
                     style: TextStyle(color: Colors.white54, fontSize: 13)),
