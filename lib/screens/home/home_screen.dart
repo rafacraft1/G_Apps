@@ -121,7 +121,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               await Provider.of<AuthProvider>(context,
                                       listen: false)
                                   .logout();
-                              if (!context.mounted) return;
+                              if (!context.mounted) {
+                                return;
+                              }
                               Navigator.pushAndRemoveUntil(
                                   context,
                                   MaterialPageRoute(
@@ -265,8 +267,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                           radius: provider.radius,
                                           namaZona: provider.namaZona,
                                         )));
-                            if (context.mounted)
+                            if (context.mounted) {
                               provider.refreshSemuaData(context);
+                            }
                           },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: config['warnaTombol'],
