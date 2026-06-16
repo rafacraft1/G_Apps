@@ -57,7 +57,7 @@ class _CameraScreenState extends State<CameraScreen>
       options: FaceDetectorOptions(
         enableClassification: false,
         enableLandmarks: false,
-        performanceMode: FaceDetectorMode.fast,
+        performanceMode: FaceDetectorMode.accurate,
       ),
     );
 
@@ -96,10 +96,12 @@ class _CameraScreenState extends State<CameraScreen>
           (c) => c.lensDirection == CameraLensDirection.front,
           orElse: () => cameras.first);
 
-      // Kualitas High Definition (HD)
       _controller = CameraController(_kameraDepan!, ResolutionPreset.high,
           enableAudio: false);
       await _controller!.initialize();
+
+      // PERBAIKAN 1: Matikan flash agar sensor auto-exposure kamera bekerja optimal dan natural
+      await _controller!.setFlashMode(FlashMode.off);
 
       await _controller!.lockCaptureOrientation(DeviceOrientation.portraitUp);
 
@@ -215,20 +217,25 @@ class _CameraScreenState extends State<CameraScreen>
     });
 
     try {
-      await _controller!.pausePreview();
+      // PERBAIKAN 2: Ambil foto terlebih dahulu saat sensor menangkap cahaya dengan sempurna
       final XFile file = await _controller!.takePicture();
       final File fotoFile = File(file.path);
+
+      // BARU layar dibekukan (pause) setelah foto berhasil dijepret
+      await _controller!.pausePreview();
 
       final inputImage = InputImage.fromFilePath(file.path);
       final faces = await _faceDetector!.processImage(inputImage);
 
-      // A. Wajah Kosong
+      // A. Validasi Kekosongan Wajah
       if (faces.isEmpty) {
-        if (fotoFile.existsSync()) fotoFile.deleteSync();
+        if (fotoFile.existsSync()) {
+          fotoFile.deleteSync();
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: const Text(
-                  'Wajah tidak terdeteksi! Pastikan wajah terlihat jelas.',
+                  'Wajah tidak terdeteksi! Pastikan area terang.',
                   style: TextStyle(color: Colors.white)),
               backgroundColor: Colors.red[700],
               behavior: SnackBarBehavior.floating,
@@ -243,13 +250,47 @@ class _CameraScreenState extends State<CameraScreen>
         return;
       }
 
-      // B. Wajah Lebih Dari Satu
-      if (faces.length > 1) {
-        if (fotoFile.existsSync()) fotoFile.deleteSync();
+      // BACA RESOLUSI GAMBAR
+      final bytes = await fotoFile.readAsBytes();
+      final decodedImage = await decodeImageFromList(bytes);
+
+      double imgW = decodedImage.width.toDouble();
+      double imgH = decodedImage.height.toDouble();
+
+      // Bug Fix Sensor Kamera Android
+      if (imgW > imgH) {
+        double temp = imgW;
+        imgW = imgH;
+        imgH = temp;
+      }
+
+      // B. LOGIKA CERDAS: MULTI-FACE DETECTOR
+      int wajahSignifikan = 0;
+      Face? wajahUtama;
+      double maxArea = 0;
+
+      for (var f in faces) {
+        double widthRatio = f.boundingBox.width / imgW;
+        double area = f.boundingBox.width * f.boundingBox.height;
+
+        if (widthRatio > 0.12) {
+          wajahSignifikan++;
+        }
+
+        if (area > maxArea) {
+          maxArea = area;
+          wajahUtama = f;
+        }
+      }
+
+      if (wajahSignifikan > 1) {
+        if (fotoFile.existsSync()) {
+          fotoFile.deleteSync();
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: const Text(
-                  'Terlalu banyak wajah! Pastikan hanya Anda di dalam frame.',
+                  'Terdeteksi lebih dari 1 wajah! Pastikan Anda memfoto sendirian.',
                   style: TextStyle(color: Colors.white)),
               backgroundColor: Colors.red[700],
               behavior: SnackBarBehavior.floating,
@@ -257,40 +298,36 @@ class _CameraScreenState extends State<CameraScreen>
                   borderRadius: BorderRadius.circular(10))));
           setState(() {
             _isProcessingPhoto = false;
-            _statusPesan = "Pastikan hanya wajah Anda di kamera";
+            _statusPesan = "Pastikan hanya Anda di dalam kamera";
           });
           await _controller!.resumePreview();
         }
         return;
       }
 
-      // C. Validasi Posisi Kordinat & Jarak Wajah
-      final face = faces.first;
-      final faceRect = face.boundingBox;
+      // C. VALIDASI POSISI OVAL (MENGGUNAKAN WAJAH UTAMA)
+      final faceRect = wajahUtama!.boundingBox;
 
-      final bytes = await fotoFile.readAsBytes();
-      final decodedImage = await decodeImageFromList(bytes);
-      final double imgW = decodedImage.width.toDouble();
-      final double imgH = decodedImage.height.toDouble();
-
-      final double safeLeft = imgW * 0.20;
-      final double safeRight = imgW * 0.80;
-      final double safeTop = imgH * 0.20;
-      final double safeBottom = imgH * 0.80;
+      final double safeLeft = imgW * 0.30;
+      final double safeRight = imgW * 0.70;
+      final double safeTop = imgH * 0.30;
+      final double safeBottom = imgH * 0.70;
 
       final double faceCenterX = faceRect.center.dx;
       final double faceCenterY = faceRect.center.dy;
 
-      // Cek apakah posisi melenceng
+      // C-1: Tolak jika wajah melenceng keluar area oval
       if (faceCenterX < safeLeft ||
           faceCenterX > safeRight ||
           faceCenterY < safeTop ||
           faceCenterY > safeBottom) {
-        if (fotoFile.existsSync()) fotoFile.deleteSync();
+        if (fotoFile.existsSync()) {
+          fotoFile.deleteSync();
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: const Text(
-                  'Wajah di luar bingkai! Posisikan wajah Anda tepat di tengah oval.',
+                  'Wajah tidak di tengah! Pastikan persis di dalam bingkai oval.',
                   style: TextStyle(color: Colors.white)),
               backgroundColor: Colors.orange[800],
               behavior: SnackBarBehavior.floating,
@@ -298,20 +335,22 @@ class _CameraScreenState extends State<CameraScreen>
                   borderRadius: BorderRadius.circular(10))));
           setState(() {
             _isProcessingPhoto = false;
-            _statusPesan = "Posisikan wajah tepat di tengah bingkai";
+            _statusPesan = "Geser wajah persis ke tengah oval";
           });
           await _controller!.resumePreview();
         }
         return;
       }
 
-      // Cek apakah terlalu jauh (Ngezoom/Kecil)
+      // C-2: Tolak jika jarak wajah terlalu jauh
       if ((faceRect.width / imgW) < 0.25) {
-        if (fotoFile.existsSync()) fotoFile.deleteSync();
+        if (fotoFile.existsSync()) {
+          fotoFile.deleteSync();
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: const Text(
-                  'Wajah terlalu jauh! Dekatkan kamera ke wajah Anda.',
+                  'Terlalu jauh! Dekatkan kamera ke wajah Anda.',
                   style: TextStyle(color: Colors.white)),
               backgroundColor: Colors.orange[800],
               behavior: SnackBarBehavior.floating,
@@ -319,14 +358,14 @@ class _CameraScreenState extends State<CameraScreen>
                   borderRadius: BorderRadius.circular(10))));
           setState(() {
             _isProcessingPhoto = false;
-            _statusPesan = "Wajah terlalu jauh, dekatkan lagi";
+            _statusPesan = "Dekatkan wajah ke kamera";
           });
           await _controller!.resumePreview();
         }
         return;
       }
 
-      // LOLOS VALIDASI
+      // D. LOLOS SEMUA VALIDASI
       if (mounted) {
         setState(
             () => _statusPesan = "Wajah terverifikasi! Menyiapkan preview...");
@@ -485,8 +524,6 @@ class _CameraScreenState extends State<CameraScreen>
                               fontWeight: FontWeight.bold))
                     ])),
                 const Spacer(),
-
-                // AREA KAMERA KOTAK 1:1
                 AspectRatio(
                   aspectRatio: 1.0,
                   child: Container(
@@ -500,27 +537,24 @@ class _CameraScreenState extends State<CameraScreen>
                       child: _isCameraInitialized && _controller != null
                           ? LayoutBuilder(
                               builder: (context, constraints) {
-                                // 1. Ambil rasio lensa (Misal 9:16 = 0.56)
                                 double ratio = _controller!.value.aspectRatio;
-                                if (ratio > 1.0) ratio = 1.0 / ratio;
+                                if (ratio > 1.0) {
+                                  ratio = 1.0 / ratio;
+                                }
 
                                 return Stack(
                                   fit: StackFit.expand,
                                   children: [
-                                    // 2. KAMERA 100% PERFECT CROP ANTI-GEPENG
                                     OverflowBox(
                                       alignment: Alignment.center,
                                       maxWidth: double.infinity,
                                       maxHeight: double.infinity,
                                       child: SizedBox(
-                                        // Lebar di-set mengikuti kotak, tinggi dibiarkan jebol ke atas/bawah secara proporsional
                                         width: constraints.maxWidth,
                                         height: constraints.maxWidth / ratio,
                                         child: CameraPreview(_controller!),
                                       ),
                                     ),
-
-                                    // 3. PANDUAN BINGKAI WAJAH
                                     Positioned.fill(
                                       child: CustomPaint(
                                         painter: FaceOverlayPainter(),
@@ -536,7 +570,6 @@ class _CameraScreenState extends State<CameraScreen>
                     ),
                   ),
                 ),
-
                 const Spacer(),
                 const Text('Silakan tekan tombol untuk mengambil foto.',
                     style: TextStyle(color: Colors.white54, fontSize: 13)),
