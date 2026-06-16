@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api/api_client.dart';
+import '../core/api/api_endpoints.dart';
+import '../core/utils/image_helper.dart';
 
 class AbsensiProvider with ChangeNotifier {
   List<dynamic> _listRiwayat = [];
@@ -28,16 +29,17 @@ class AbsensiProvider with ChangeNotifier {
     }
 
     try {
-      final response = await ApiClient().dio.get('absen/riwayat');
+      final response = await ApiClient().dio.get(ApiEndpoints.riwayatAbsen);
 
       if (response.statusCode == 200 && response.data != null) {
         _listRiwayat = response.data['data'] ?? [];
         await prefs.setString(_cacheKey, jsonEncode(_listRiwayat));
       } else {
-        if (cachedData == null) _listRiwayat = [];
+        if (cachedData == null) {
+          _listRiwayat = [];
+        }
       }
-    } catch (e) {
-      debugPrint('Gagal ambil daftar riwayat: $e');
+    } catch (_) {
     } finally {
       _isLoadingRiwayat = false;
       notifyListeners();
@@ -70,21 +72,12 @@ class AbsensiProvider with ChangeNotifier {
     File? fileToCleanUp;
 
     try {
-      final filePath = foto.absolute.path;
-      final extensionIndex = filePath.lastIndexOf('.');
-      final outPath = "${filePath.substring(0, extensionIndex)}_compressed.jpg";
+      File? compressedFile = await ImageHelper.compressImage(foto);
 
-      XFile? compressedFile = await FlutterImageCompress.compressAndGetFile(
-        foto.absolute.path,
-        outPath,
-        quality: 60,
-        minWidth: 800,
-        minHeight: 800,
-      );
-
-      File finalFile =
-          compressedFile != null ? File(compressedFile.path) : foto;
-      if (compressedFile != null) fileToCleanUp = finalFile;
+      File finalFile = compressedFile ?? foto;
+      if (compressedFile != null) {
+        fileToCleanUp = finalFile;
+      }
 
       FormData formData = FormData.fromMap({
         'latitude': lat.toString(),
@@ -97,7 +90,7 @@ class AbsensiProvider with ChangeNotifier {
       });
 
       final response = await ApiClient().dio.post(
-            'absen/$tipeAbsen',
+            ApiEndpoints.absen(tipeAbsen),
             data: formData,
           );
 
@@ -114,7 +107,7 @@ class AbsensiProvider with ChangeNotifier {
             pesanError;
       }
       throw pesanError;
-    } catch (e) {
+    } catch (_) {
       throw 'Terjadi kesalahan saat memproses absensi.';
     } finally {
       if (fileToCleanUp != null && await fileToCleanUp.exists()) {

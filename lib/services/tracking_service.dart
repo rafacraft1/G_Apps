@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import '../core/api/api_client.dart';
+import '../core/api/api_endpoints.dart';
 
 class TrackingService {
-  /// Mendapatkan Device ID secara independen untuk Pelacakan
   static Future<String> _getDeviceId() async {
     final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
     try {
@@ -19,13 +19,10 @@ class TrackingService {
         return "Apple_${iosInfo.model}_iOS-${iosInfo.systemVersion}_${iosInfo.identifierForVendor ?? 'unknown_id'}"
             .replaceAll(' ', '_');
       }
-    } catch (e) {
-      debugPrint('Tracking Device ID Error: $e');
-    }
+    } catch (_) {}
     return 'unknown_device';
   }
 
-  /// Fungsi ini HANYA dipanggil saat menerima perintah FCM dari Admin (Bekerja di Latar Belakang)
   static Future<void> sendLocationOnDemand() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -35,15 +32,12 @@ class TrackingService {
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) return;
 
-      // Paksa ambil posisi akurasi tinggi saat itu juga
       Position pos = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
-
       String deviceId = await _getDeviceId();
 
-      // Langsung kirim data ke backend sesuai format CI4 (Flat Data + Device ID Header)
       await ApiClient().dio.post(
-            'tracking/updateLokasi',
+            ApiEndpoints.updateLokasi,
             data: {
               'latitude': pos.latitude,
               'longitude': pos.longitude,
@@ -51,14 +45,8 @@ class TrackingService {
               'is_mock': pos.isMocked ? 1 : 0,
               'device_timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
             },
-            options: Options(
-              headers: {
-                'X-Device-ID': deviceId,
-              },
-            ),
+            options: Options(headers: {'X-Device-ID': deviceId}),
           );
-    } catch (e) {
-      debugPrint('Gagal sinkronisasi pelacakan on-demand: $e');
-    }
+    } catch (_) {}
   }
 }
