@@ -18,7 +18,7 @@ class CameraScreen extends StatefulWidget {
   final double latSekolah;
   final double lonSekolah;
   final double radius;
-  final String namaZona; // Menerima nama zona dari HomeScreen
+  final String namaZona;
 
   const CameraScreen({
     super.key,
@@ -117,32 +117,39 @@ class _CameraScreenState extends State<CameraScreen>
 
   Future<void> _initCameraAndLocation() async {
     try {
-      if (mounted)
+      if (mounted) {
         setState(() => _statusLoading = "Memindai Titik Koordinat Anda...");
+      }
 
       Map<String, dynamic> locationData =
           await LocationHelper.getCurrentLocationWithMockStatus();
       _posisi = locationData['position'] as Position;
       _isFakeGpsDetected = locationData['is_mocked'] as bool;
 
-      if (mounted)
+      if (mounted) {
         setState(() => _statusLoading = "Menghitung Jarak Jangkauan...");
+      }
 
       double jarak = Geolocator.distanceBetween(_posisi!.latitude,
           _posisi!.longitude, widget.latSekolah, widget.lonSekolah);
 
       if (jarak > widget.radius && !isDispensasi) {
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
         setState(() => _isLoading = false);
         _tampilkanPesanLuarArea(jarak);
         return;
       }
 
-      if (mounted)
+      if (mounted) {
         setState(() => _statusLoading = "Menghubungkan ke Lensa Kamera...");
+      }
 
       await _initCameraOnly();
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
@@ -199,9 +206,6 @@ class _CameraScreenState extends State<CameraScreen>
     );
   }
 
-  // ==============================================================
-  // FUNGSI KHUSUS PEMBUATAN WATERMARK FISIK KE DALAM FOTO
-  // ==============================================================
   Future<File> _tambahkanWatermark(
       File imageFile, ui.Image decodedImage, bool needsRotation) async {
     try {
@@ -213,25 +217,26 @@ class _CameraScreenState extends State<CameraScreen>
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
 
-      // 1. Gambar Foto Utama & Balikkan Efek Cermin (Mirror)
       canvas.save();
       if (needsRotation) {
         canvas.translate(finalW, 0);
         canvas.rotate(math.pi / 2);
         canvas.translate(imgW, 0);
-        canvas.scale(-1.0, 1.0); // Terapkan Mirroring Fisik
+        canvas.scale(-1.0, 1.0);
       } else {
         canvas.translate(finalW, 0);
-        canvas.scale(-1.0, 1.0); // Terapkan Mirroring Fisik
+        canvas.scale(-1.0, 1.0);
       }
       canvas.drawImage(decodedImage, Offset.zero, Paint());
       canvas.restore();
 
-      // 2. Siapkan Data Watermark Dinamis
       String namaSiswa = await SecureStorageHelper.getUserName() ?? 'Siswa';
       String kelas = await SecureStorageHelper.getUserKelas() ?? 'Kelas';
       String tipe = isMasuk ? 'Masuk' : 'Pulang';
-      if (isDispensasi) tipe += ' (Dispensasi)';
+
+      if (isDispensasi) {
+        tipe += ' (Dispensasi)';
+      }
 
       final now = DateTime.now();
       final hari = [
@@ -263,8 +268,7 @@ class _CameraScreenState extends State<CameraScreen>
       String watermarkText =
           "$namaSiswa\n$kelas\nAbsen $tipe - ${widget.namaZona}\n$tanggalWaktu";
 
-      // 3. Konfigurasi Gaya Teks
-      double fontSize = finalW * 0.030; // Proporsi 3% dari ukuran foto HD
+      double fontSize = finalW * 0.030;
       final textStyle = ui.TextStyle(
         color: Colors.white,
         fontSize: fontSize,
@@ -291,7 +295,6 @@ class _CameraScreenState extends State<CameraScreen>
       final paragraph = paragraphBuilder.build();
       paragraph.layout(ui.ParagraphConstraints(width: textLayoutWidth));
 
-      // 4. Background Teks Hitam Transparan
       final double textPadding = finalW * 0.02;
       final bgRect = RRect.fromLTRBR(
           finalW - rightMargin - paragraph.longestLine - textPadding,
@@ -303,7 +306,6 @@ class _CameraScreenState extends State<CameraScreen>
       canvas.drawRRect(bgRect, Paint()..color = Colors.black.withOpacity(0.5));
       canvas.drawParagraph(paragraph, Offset(rightMargin, topMargin));
 
-      // 5. Simpan Hasil Canvas ke File Baru
       final picture = recorder.endRecording();
       final img = await picture.toImage(finalW.toInt(), finalH.toInt());
 
@@ -340,9 +342,10 @@ class _CameraScreenState extends State<CameraScreen>
       final inputImage = InputImage.fromFilePath(file.path);
       final faces = await _faceDetector!.processImage(inputImage);
 
-      // A. Wajah Kosong
       if (faces.isEmpty) {
-        if (fotoFile.existsSync()) fotoFile.deleteSync();
+        if (fotoFile.existsSync()) {
+          fotoFile.deleteSync();
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: const Text(
@@ -361,7 +364,6 @@ class _CameraScreenState extends State<CameraScreen>
         return;
       }
 
-      // -- BACA RESOLUSI GAMBAR MENTAH --
       final bytes = await fotoFile.readAsBytes();
       final decodedImage = await decodeImageFromList(bytes);
 
@@ -375,7 +377,6 @@ class _CameraScreenState extends State<CameraScreen>
         imgH = temp;
       }
 
-      // B. LOGIKA CERDAS: MULTI-FACE DETECTOR
       int wajahSignifikan = 0;
       Face? wajahUtama;
       double maxArea = 0;
@@ -384,7 +385,9 @@ class _CameraScreenState extends State<CameraScreen>
         double widthRatio = f.boundingBox.width / imgW;
         double area = f.boundingBox.width * f.boundingBox.height;
 
-        if (widthRatio > 0.12) wajahSignifikan++;
+        if (widthRatio > 0.12) {
+          wajahSignifikan++;
+        }
 
         if (area > maxArea) {
           maxArea = area;
@@ -393,7 +396,9 @@ class _CameraScreenState extends State<CameraScreen>
       }
 
       if (wajahSignifikan > 1) {
-        if (fotoFile.existsSync()) fotoFile.deleteSync();
+        if (fotoFile.existsSync()) {
+          fotoFile.deleteSync();
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: const Text(
@@ -412,7 +417,6 @@ class _CameraScreenState extends State<CameraScreen>
         return;
       }
 
-      // C. VALIDASI POSISI OVAL (MENGGUNAKAN WAJAH UTAMA)
       final faceRect = wajahUtama!.boundingBox;
 
       final double safeLeft = imgW * 0.30;
@@ -427,7 +431,9 @@ class _CameraScreenState extends State<CameraScreen>
           faceCenterX > safeRight ||
           faceCenterY < safeTop ||
           faceCenterY > safeBottom) {
-        if (fotoFile.existsSync()) fotoFile.deleteSync();
+        if (fotoFile.existsSync()) {
+          fotoFile.deleteSync();
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: const Text(
@@ -447,7 +453,9 @@ class _CameraScreenState extends State<CameraScreen>
       }
 
       if ((faceRect.width / imgW) < 0.25) {
-        if (fotoFile.existsSync()) fotoFile.deleteSync();
+        if (fotoFile.existsSync()) {
+          fotoFile.deleteSync();
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: const Text(
@@ -466,12 +474,16 @@ class _CameraScreenState extends State<CameraScreen>
         return;
       }
 
-      // D. LOLOS SEMUA VALIDASI -> INJEKSI WATERMARK KE FISIK FOTO
       if (mounted) {
         setState(() => _statusPesan = "Menyematkan Watermark...");
 
         fotoFile =
             await _tambahkanWatermark(fotoFile, decodedImage, needsRotation);
+
+        // PERBAIKAN: Menggunakan mounted milik class State agar linter patuh
+        if (!mounted) {
+          return;
+        }
 
         setState(
             () => _statusPesan = "Wajah terverifikasi! Menyiapkan preview...");

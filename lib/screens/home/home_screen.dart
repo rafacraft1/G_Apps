@@ -62,7 +62,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _updateFCMToken();
     _refreshSemuaData();
 
-    // Timer ini berdetak setiap 1 detik untuk mengupdate waktu secara lokal
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_waktuServerNotifier.value != null) {
         _waktuServerNotifier.value =
@@ -143,7 +142,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _radius =
               double.tryParse(serverData['radius']?.toString() ?? '50.0') ??
                   50.0;
-
           _namaZona = serverData['nama_zona'] ?? 'Area Sekolah';
 
           _isMemuatWaktu = false;
@@ -169,7 +167,6 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     } catch (e) {
-      debugPrint('Error fetch waktu server: $e');
       if (!mounted) return;
       setState(() => _isMemuatWaktu = false);
     }
@@ -210,7 +207,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _isMemuatLokasi = false;
       });
     } catch (e) {
-      debugPrint('Error lokasi: $e');
       if (!mounted) return;
       setState(() {
         _jarakMeter = null;
@@ -283,6 +279,7 @@ class _HomeScreenState extends State<HomeScreen> {
           } else {
             statusHariIni = 'Belum Absen';
             warnaStatus = Colors.orange;
+
             if (waktuSaatIni.isBefore(batasAwalMasuk)) {
               labelTombol = 'Belum Waktunya';
               subLabel =
@@ -376,8 +373,8 @@ class _HomeScreenState extends State<HomeScreen> {
               iconTombol = Icons.gps_off;
               isTombolDisable = true;
             } else if (_jarakMeter! > _radius) {
-              labelTombol = 'Tidak Bisa Absen';
-              subLabel = 'Di Luar Zona Absen';
+              labelTombol = 'Di Luar Zona';
+              subLabel = 'Tidak bisa absen diluar zona lokasi absen';
               warnaTombol = Colors.redAccent;
               iconTombol = Icons.location_off;
               isTombolDisable = true;
@@ -618,7 +615,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: config['warnaTombol'],
                   disabledBackgroundColor:
-                      (config['warnaTombol'] as Color).withOpacity(0.9),
+                      (config['warnaTombol'] as Color).withOpacity(0.8),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16)),
                 ),

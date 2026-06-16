@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -74,12 +73,8 @@ class PreviewBottomSheet {
                   borderRadius: BorderRadius.circular(18),
                   child: AspectRatio(
                     aspectRatio: 1.0,
-                    child: Transform(
-                      alignment: Alignment.center,
-                      transform: Matrix4.rotationY(math.pi),
-                      child: Image.file(foto,
-                          width: double.infinity, fit: BoxFit.cover),
-                    ),
+                    child: Image.file(foto,
+                        width: double.infinity, fit: BoxFit.cover),
                   ),
                 ),
               ),
