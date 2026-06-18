@@ -26,12 +26,10 @@ if (flutterVersionName == null) {
 android {
     namespace "id.web.nurindra.geofence_app"
     
-    // SDK 35 untuk sinkronisasi Workmanager
     compileSdk 35 
     ndkVersion "25.1.8937393"
 
     compileOptions {
-        // ✅ TAMBAHAN 1: Mengaktifkan fitur desugaring
         coreLibraryDesugaringEnabled true
         
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -60,13 +58,25 @@ android {
             signingConfig signingConfigs.debug
         }
     }
+
+    // Blok untuk mengatur custom penamaan file APK
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            def appName = "GeofenceApp"
+            def version = defaultConfig.versionName 
+            
+            def abi = output.getFilter(com.android.build.OutputFile.ABI)
+            def abiSuffix = abi != null ? "-${abi}" : ""
+            
+            outputFileName = "${appName}-v${version}${abiSuffix}.apk"
+        }
+    }
 }
 
 flutter {
     source '../..'
 }
 
-// ✅ TAMBAHAN 2: Modul dependency untuk Java 8+ APIs di SDK 21
 dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
 }
