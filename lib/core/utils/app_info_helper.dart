@@ -19,17 +19,14 @@ class AppInfoHelper {
             ),
           ),
           const SizedBox(height: 2),
-          // Menggunakan FutureBuilder agar otomatis mengambil versi pubspec.yaml
           FutureBuilder<PackageInfo>(
             future: PackageInfo.fromPlatform(),
             builder: (context, snapshot) {
               String versionText = "Memuat versi...";
 
               if (snapshot.hasData) {
-                versionText =
-                    "Versi ${snapshot.data!.version}+${snapshot.data!.buildNumber}";
+                versionText = "Versi ${snapshot.data!.version}";
               } else if (snapshot.hasError) {
-                // Fallback jika package_info_plus gagal memuat
                 versionText = "Versi 2.0.1";
               }
 
