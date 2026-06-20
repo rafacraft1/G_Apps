@@ -51,6 +51,8 @@ class _LoginScreenState extends State<LoginScreen> {
       return false;
     }
 
+    await Permission.notification.request();
+
     Permission storagePermission = Permission.storage;
     if (Platform.isAndroid) {
       final androidInfo = await DeviceInfoPlugin().androidInfo;

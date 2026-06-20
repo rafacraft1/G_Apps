@@ -1,4 +1,6 @@
 import 'package:permission_handler/permission_handler.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'dart:io';
 
 class PermissionHelper {
   static Future<void> requestAllPermissions() async {
@@ -16,5 +18,16 @@ class PermissionHelper {
         await Permission.locationAlways.request();
       }
     }
+
+    await Permission.camera.request();
+
+    Permission storagePermission = Permission.storage;
+    if (Platform.isAndroid) {
+      final androidInfo = await DeviceInfoPlugin().androidInfo;
+      if (androidInfo.version.sdkInt >= 33) {
+        storagePermission = Permission.photos;
+      }
+    }
+    await storagePermission.request();
   }
 }

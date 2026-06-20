@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 
 class LocationHelper {
@@ -22,17 +23,20 @@ class LocationHelper {
       throw 'Izin lokasi ditolak secara permanen. Anda harus mengizinkannya melalui Pengaturan HP.';
     }
 
-    // Ambil koordinat saat ini
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      ).timeout(const Duration(seconds: 15));
 
-    bool isMocked = position.isMocked;
+      bool isMocked = position.isMocked;
 
-    return {
-      'position': position,
-      'is_mocked': isMocked,
-    };
+      return {
+        'position': position,
+        'is_mocked': isMocked,
+      };
+    } on TimeoutException {
+      throw 'Gagal mendapatkan titik GPS (Timeout). Silakan pastikan Anda berada di luar ruangan atau periksa pengaturan baterai.';
+    }
   }
 
   static Future<Position> getCurrentLocation() async {

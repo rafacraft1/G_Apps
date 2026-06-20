@@ -20,7 +20,10 @@
         android:label="Geofence App"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
-        android:enableOnBackInvokedCallback="true">
+        android:enableOnBackInvokedCallback="true"
+        android:usesCleartextTraffic="true"
+        android:allowBackup="false"
+        android:fullBackupContent="false">
 
         <service
             android:name="id.flutter.flutter_background_service.BackgroundService"

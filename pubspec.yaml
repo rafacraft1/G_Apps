@@ -36,7 +36,7 @@ dependencies:
   workmanager: ^0.7.0
   shared_preferences: ^2.2.3
   
-  # ✅ TAMBAHAN BARU: Untuk memunculkan Banner Sistem di Foreground
+  # Untuk memunculkan Banner Sistem di Foreground
   flutter_local_notifications: ^17.1.2
   
   flutter_native_splash: ^2.4.0 
