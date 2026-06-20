@@ -26,12 +26,11 @@ class AppInfoHelper {
               String versionText = "Memuat versi...";
 
               if (snapshot.hasData) {
-                // Menampilkan format: Versi 2.0.1+1
                 versionText =
                     "Versi ${snapshot.data!.version}+${snapshot.data!.buildNumber}";
               } else if (snapshot.hasError) {
                 // Fallback jika package_info_plus gagal memuat
-                versionText = "Versi 2.0.1+1";
+                versionText = "Versi 2.0.1";
               }
 
               return Text(
