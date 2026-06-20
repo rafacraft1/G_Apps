@@ -6,7 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../core/utils/secure_storage_helper.dart';
-import '../../core/utils/app_info_helper.dart'; // [TAMBAHAN BARU] Import AppInfoHelper
+import '../../core/utils/app_info_helper.dart';
 
 import '../auth/login_screen.dart';
 import '../izin/riwayat_izin_screen.dart';
@@ -65,17 +65,84 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _pilihDanUploadFoto() async {
+  // --- BAGIAN YANG DIUBAH: MENAMBAHKAN BOTTOM SHEET ---
+
+  // 1. Fungsi untuk memunculkan BottomSheet pilihan Kamera atau Galeri
+  void _tampilkanPilihanFoto() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext bc) {
+        return SafeArea(
+          child: Wrap(
+            children: <Widget>[
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 24, 20, 10),
+                child: Text(
+                  'Pilih Sumber Foto',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child:
+                      const Icon(Icons.camera_alt_rounded, color: Colors.blue),
+                ),
+                title: const Text('Ambil dari Kamera',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                onTap: () {
+                  Navigator.pop(context); // Tutup BottomSheet
+                  _prosesUploadFoto(ImageSource.camera); // Buka Kamera
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.photo_library_rounded,
+                      color: Colors.orange),
+                ),
+                title: const Text('Pilih dari Galeri',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                onTap: () {
+                  Navigator.pop(context); // Tutup BottomSheet
+                  _prosesUploadFoto(ImageSource.gallery); // Buka Galeri
+                },
+              ),
+              const SizedBox(height: 80), // Memberikan sedikit ruang di bawah
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 2. Fungsi untuk mengeksekusi upload berdasarkan sumber yang dipilih
+  Future<void> _prosesUploadFoto(ImageSource source) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     try {
       final XFile? image = await _picker.pickImage(
-          source: ImageSource.gallery, imageQuality: 70);
-      if (image == null) return;
+        source: source,
+        imageQuality: 70, // Kompresi agar ukuran file aman
+      );
+
+      if (image == null) return; // Jika user batal memilih foto
 
       if (!mounted) return;
       setState(() => _isUploadingFoto = true);
 
+      // Proses upload ke server
       final newUrl = await authProvider.uploadFotoProfil(File(image.path));
 
       if (!mounted) return;
@@ -97,6 +164,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
   }
+  // --- AKHIR BAGIAN YANG DIUBAH ---
 
   void _ajukanReset() {
     showDialog(
@@ -234,7 +302,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             namaKelas: _namaKelas,
                             fotoUrl: _fotoUrl,
                             isUploading: _isUploadingFoto,
-                            onUploadTap: _pilihDanUploadFoto,
+                            // UBAH PEMANGGILAN FUNGSI DI SINI:
+                            onUploadTap: _tampilkanPilihanFoto,
                             getValidUrl: _getValidFotoUrl,
                           ),
                           const SizedBox(height: 32),
@@ -257,7 +326,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const SizedBox(height: 32),
                           SecurityMenu(onResetTap: _ajukanReset),
                           const SizedBox(height: 20),
-                          // [TAMBAHAN BARU] Footer diletakkan di akhir layar profil
                           Center(child: AppInfoHelper.buildFooter()),
                           const SizedBox(height: 20),
                         ],

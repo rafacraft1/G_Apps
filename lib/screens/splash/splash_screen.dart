@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import '../../core/utils/secure_storage_helper.dart';
-import '../../core/utils/app_info_helper.dart'; // [TAMBAHAN BARU]
+import '../../core/utils/app_info_helper.dart';
 import '../auth/login_screen.dart';
 import '../home/home_screen.dart';
 
@@ -22,7 +22,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _jalankanSplashScreen() async {
     try {
-      // [UPDATE ZERO ERROR & UX]
       // Menggunakan Future.wait untuk menjalankan pembacaan token dan
       // jeda minimum (2 detik) secara paralel (bersamaan).
       final List<dynamic> results = await Future.wait([
@@ -36,26 +35,30 @@ class _SplashScreenState extends State<SplashScreen> {
       // Hasil pengambilan token berada di index 0 dari Future.wait
       final String? token = results[0] as String?;
 
+      // OPTIMALISASI: Menggunakan pushAndRemoveUntil untuk memastikan
+      // splash screen benar-benar terhapus dari tumpukan memori navigasi.
       if (token != null && token.isNotEmpty) {
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
         );
       } else {
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
         );
       }
     } catch (e) {
-      // [FALLBACK ZERO ERROR]
       // Jika terjadi error pada OS/Storage saat mengambil token,
       // aplikasi tidak akan freeze, melainkan aman di-routing ke LoginScreen.
       if (!mounted) return;
 
-      Navigator.pushReplacement(
+      Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
       );
     }
   }
@@ -125,8 +128,8 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Padding(
           padding: const EdgeInsets.only(bottom: 20),
           child: Text(
-            // Menggunakan variabel dinamis dari AppInfoHelper
-            'Versi ${AppInfoHelper.appVersion} - ${AppInfoHelper.copyright}',
+            // [DIUBAH]: Menghilangkan versi aplikasi, hanya menampilkan copyright
+            AppInfoHelper.copyright,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withOpacity(0.6),
