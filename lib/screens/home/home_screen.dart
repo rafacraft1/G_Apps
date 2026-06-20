@@ -25,7 +25,6 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-// [UI/UX UPDATE] Menambahkan SingleTickerProviderStateMixin untuk animasi
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
@@ -36,7 +35,6 @@ class _HomeScreenState extends State<HomeScreen>
   void initState() {
     super.initState();
 
-    // Inisialisasi Animasi Masuk (Entry Animation)
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
@@ -54,7 +52,6 @@ class _HomeScreenState extends State<HomeScreen>
       final homeProvider = Provider.of<HomeProvider>(context, listen: false);
 
       homeProvider.loadProfileData();
-      // Mulai animasi segera setelah frame pertama di-render
       _animationController.forward();
       homeProvider.refreshSemuaData(context);
     });
@@ -69,8 +66,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(
-          0xFFF8F9FA), // Latar abu-abu sangat muda yang lebih premium
+      backgroundColor: const Color(0xFFF8F9FA),
       body: Consumer<HomeProvider>(
         builder: (context, provider, child) {
           return RefreshIndicator(
@@ -78,7 +74,6 @@ class _HomeScreenState extends State<HomeScreen>
             backgroundColor: Colors.white,
             onRefresh: () async {
               await provider.refreshSemuaData(context);
-              // Mainkan ulang animasi saat di-refresh agar terasa responsif
               _animationController.forward(from: 0.0);
             },
             child: CustomScrollView(
@@ -86,10 +81,9 @@ class _HomeScreenState extends State<HomeScreen>
                   parent: AlwaysScrollableScrollPhysics()),
               slivers: [
                 SliverToBoxAdapter(
-                  child: Stack(
-                    alignment: Alignment.topCenter,
+                  child: Column(
                     children: [
-                      // 1. HEADER (Latar Belakang & Profil)
+                      // 1. HEADER
                       HomeHeader(
                         namaSiswa: provider.namaSiswa,
                         namaKelas: provider.namaKelas,
@@ -115,11 +109,9 @@ class _HomeScreenState extends State<HomeScreen>
                         },
                       ),
 
-                      // 2. KONTEN UTAMA (Alur Natural / Natural Flow Layout)
-                      Container(
-                        // Titik 170 memastikan letak konten tumpang tindih sempurna dengan header
-                        // tanpa menutupi tombol/avatar. Nol risiko layout berantakan!
-                        margin: const EdgeInsets.only(top: 170),
+                      // 2. KONTEN UTAMA
+                      Transform.translate(
+                        offset: const Offset(0, -45),
                         child: FadeTransition(
                           opacity: _fadeAnimation,
                           child: SlideTransition(
@@ -259,8 +251,6 @@ class _HomeScreenState extends State<HomeScreen>
 
                                   const SizedBox(height: 32),
                                   Center(child: AppInfoHelper.buildFooter()),
-                                  const SizedBox(
-                                      height: 40), // Jarak napas di ujung bawah
                                 ],
                               ),
                             ),
@@ -279,7 +269,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
-// [UI/UX UPDATE] Menu Layanan Siswa yang diperhalus bayangannya dan animasi pantulannya
 class _AnimatedMenuCard extends StatefulWidget {
   final String title;
   final String subtitle;
@@ -309,53 +298,102 @@ class _AnimatedMenuCardState extends State<_AnimatedMenuCard> {
       onPointerUp: (_) => setState(() => _isPressed = false),
       onPointerCancel: (_) => setState(() => _isPressed = false),
       child: AnimatedScale(
-        scale: _isPressed ? 0.95 : 1.0,
+        scale: _isPressed ? 0.96 : 1.0,
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOutQuart,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
+        child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-                color: Colors.grey[100]!), // Garis tepi yang sangat tipis
+            borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: _isPressed
-                    ? Colors.black.withOpacity(0.01)
-                    : Colors.black.withOpacity(0.04),
-                blurRadius: _isPressed ? 10 : 20,
-                offset: _isPressed ? const Offset(0, 4) : const Offset(0, 8),
+                color: widget.color.withOpacity(_isPressed ? 0.04 : 0.12),
+                blurRadius: _isPressed ? 10 : 24,
+                offset: _isPressed ? const Offset(0, 4) : const Offset(0, 10),
               )
             ],
           ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: widget.onTap,
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: widget.onTap,
+                child: Stack(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                          color: widget.color[50], shape: BoxShape.circle),
-                      child:
-                          Icon(widget.icon, color: widget.color[600], size: 26),
+                    // --- Ikon Watermark di Background ---
+                    Positioned(
+                      right: -15,
+                      bottom: -15,
+                      child: Icon(
+                        widget.icon,
+                        size: 90,
+                        color: widget.color.withOpacity(0.04),
+                      ),
                     ),
-                    const SizedBox(height: 18),
-                    Text(widget.title,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: Colors.black87)),
-                    const SizedBox(height: 4),
-                    Text(widget.subtitle,
-                        style:
-                            TextStyle(fontSize: 12, color: Colors.grey[500])),
+
+                    // --- Konten Utama Card ---
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      widget.color[400]!,
+                                      widget.color[700]!
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: widget.color.withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    )
+                                  ],
+                                ),
+                                child: Icon(widget.icon,
+                                    color: Colors.white, size: 24),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Icon(Icons.arrow_forward_ios_rounded,
+                                    size: 14, color: Colors.grey[300]),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            widget.title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                              color: Colors.black87,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            widget.subtitle,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[500],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),

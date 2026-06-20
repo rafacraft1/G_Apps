@@ -25,7 +25,6 @@ class HomeHeader extends StatelessWidget {
 
   static String? _cachedHost;
 
-  // [UI/UX UPDATE] Fungsi Salam Dinamis berdasarkan waktu lokal
   String _getGreeting() {
     final hour = DateTime.now().hour;
     if (hour >= 4 && hour < 11) return 'Selamat Pagi,';
@@ -86,8 +85,9 @@ class HomeHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      // Padding bottom diperbesar sedikit untuk keamanan radius status card
-      padding: const EdgeInsets.only(top: 10, bottom: 140),
+      // [SOLUSI UTAMA] Padding bottom dipatok di 80px sebagai ruang biru.
+      // Nantinya akan ditimpa oleh StatusCard sejauh 45px, menyisakan 35px batas biru dengan Avatar.
+      padding: const EdgeInsets.only(top: 10, bottom: 80),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -97,7 +97,6 @@ class HomeHeader extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          // [UI/UX UPDATE] Elemen Dekorasi Latar Belakang Abstrak
           Positioned(
             top: -50,
             right: -50,
@@ -122,8 +121,6 @@ class HomeHeader extends StatelessWidget {
               ),
             ),
           ),
-
-          // Konten Utama Header
           SafeArea(
             bottom: false,
             child: Column(
@@ -138,7 +135,6 @@ class HomeHeader extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
-                            // [UI/UX UPDATE] Efek semi-glassmorphism yang lebih halus
                             color: Colors.white.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
@@ -214,7 +210,7 @@ class HomeHeader extends StatelessWidget {
                                   )
                                 ]),
                             child: CircleAvatar(
-                              radius: 30, // Sedikit diperbesar
+                              radius: 30,
                               backgroundColor: Colors.white,
                               backgroundImage:
                                   fotoUrl != null && fotoUrl!.isNotEmpty
@@ -242,8 +238,7 @@ class HomeHeader extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                                _getGreeting(), // [UI/UX UPDATE] Memanggil salam dinamis
+                            Text(_getGreeting(),
                                 style: TextStyle(
                                     color: Colors.blue[100],
                                     fontSize: 13,
