@@ -1,34 +1,36 @@
 import 'package:flutter/material.dart';
 
-class SecurityMenu extends StatelessWidget {
+class SecurityMenu extends StatefulWidget {
   final VoidCallback onResetTap;
 
   const SecurityMenu({super.key, required this.onResetTap});
 
   @override
+  State<SecurityMenu> createState() => _SecurityMenuState();
+}
+
+class _SecurityMenuState extends State<SecurityMenu> {
+  bool _isPressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Keamanan Akun',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey[600],
-            letterSpacing: 0.5,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
+    return Listener(
+      onPointerDown: (_) => setState(() => _isPressed = true),
+      onPointerUp: (_) => setState(() => _isPressed = false),
+      onPointerCancel: (_) => setState(() => _isPressed = false),
+      child: AnimatedScale(
+        scale: _isPressed ? 0.96 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOutQuart,
+        child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
+                color: Colors.orange.withOpacity(_isPressed ? 0.04 : 0.08),
+                blurRadius: _isPressed ? 10 : 20,
+                offset: _isPressed ? const Offset(0, 4) : const Offset(0, 8),
               ),
             ],
           ),
@@ -36,7 +38,7 @@ class SecurityMenu extends StatelessWidget {
             color: Colors.transparent,
             child: InkWell(
               borderRadius: BorderRadius.circular(20),
-              onTap: onResetTap,
+              onTap: widget.onResetTap,
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Row(
@@ -44,11 +46,20 @@ class SecurityMenu extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(Icons.phonelink_erase_rounded,
-                          color: Colors.orange[700], size: 26),
+                          gradient: LinearGradient(
+                            colors: [Colors.orange[400]!, Colors.orange[700]!],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.orange.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4))
+                          ]),
+                      child: const Icon(Icons.phonelink_erase_rounded,
+                          color: Colors.white, size: 24),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -56,10 +67,10 @@ class SecurityMenu extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Reset Perangkat Lokal',
+                            'Reset Perangkat',
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
                               color: Colors.black87,
                             ),
                           ),
@@ -67,22 +78,23 @@ class SecurityMenu extends StatelessWidget {
                           Text(
                             'Bersihkan sesi jika ingin ganti HP',
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 12,
                               color: Colors.grey[500],
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
                     ),
                     Icon(Icons.arrow_forward_ios_rounded,
-                        size: 18, color: Colors.grey[400]),
+                        size: 20, color: Colors.grey[300]),
                   ],
                 ),
               ),
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }

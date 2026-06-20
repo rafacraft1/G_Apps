@@ -3,7 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 class ProfileCard extends StatelessWidget {
   final String namaSiswa;
-  final String namaKelas; // Parameter yang menyelesaikan error Anda
+  final String namaKelas;
   final String? fotoUrl;
   final bool isUploading;
   final VoidCallback onUploadTap;
@@ -12,7 +12,7 @@ class ProfileCard extends StatelessWidget {
   const ProfileCard({
     super.key,
     required this.namaSiswa,
-    required this.namaKelas, // Diwajibkan di konstruktor
+    required this.namaKelas,
     required this.fotoUrl,
     required this.isUploading,
     required this.onUploadTap,
@@ -23,20 +23,22 @@ class ProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       alignment: Alignment.topCenter,
+      clipBehavior: Clip.none,
       children: [
         // Kotak Putih Latar Belakang
         Container(
-          margin: const EdgeInsets.only(top: 50),
+          margin: const EdgeInsets.only(top: 55),
           padding: const EdgeInsets.fromLTRB(20, 65, 20, 24),
           width: double.infinity,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 24,
+                spreadRadius: 2,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
@@ -48,27 +50,28 @@ class ProfileCard extends StatelessWidget {
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
                   color: Colors.black87,
+                  letterSpacing: 0.3,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.blue[50],
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.blue[100]!),
+                  border: Border.all(color: Colors.blue[100]!.withOpacity(0.5)),
                 ),
                 child: Text(
-                  // Menampilkan data kelas dinamis
                   namaKelas != 'Siswa Aktif'
                       ? 'Kelas $namaKelas'
                       : 'Siswa Aktif',
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.blue[700],
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),
@@ -82,29 +85,38 @@ class ProfileCard extends StatelessWidget {
           child: Stack(
             alignment: Alignment.bottomRight,
             children: [
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                child: CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Colors.blue[50],
-                  backgroundImage: fotoUrl != null && fotoUrl!.isNotEmpty
-                      ? CachedNetworkImageProvider(getValidUrl(fotoUrl))
-                      : null,
-                  child: fotoUrl == null || fotoUrl!.isEmpty
-                      ? Text(
-                          namaSiswa.isNotEmpty
-                              ? namaSiswa.substring(0, 1).toUpperCase()
-                              : 'S',
-                          style: TextStyle(
-                              fontSize: 36,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue[800]),
+              Hero(
+                tag: 'profil_avatar',
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 15,
+                          offset: const Offset(0, 8),
                         )
-                      : null,
+                      ]),
+                  child: CircleAvatar(
+                    radius: 54, // Sedikit diperbesar
+                    backgroundColor: Colors.blue[50],
+                    backgroundImage: fotoUrl != null && fotoUrl!.isNotEmpty
+                        ? CachedNetworkImageProvider(getValidUrl(fotoUrl))
+                        : null,
+                    child: fotoUrl == null || fotoUrl!.isEmpty
+                        ? Text(
+                            namaSiswa.isNotEmpty
+                                ? namaSiswa.substring(0, 1).toUpperCase()
+                                : 'S',
+                            style: TextStyle(
+                                fontSize: 38,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.blue[800]),
+                          )
+                        : null,
+                  ),
                 ),
               ),
 
@@ -114,29 +126,42 @@ class ProfileCard extends StatelessWidget {
                       bottom: 5,
                       right: 5,
                       child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                            color: Colors.white, shape: BoxShape.circle),
-                        child: const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2.5),
-                        ),
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4)
+                            ]),
+                        child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.5, color: Colors.orange[600])),
                       ),
                     )
                   : GestureDetector(
                       onTap: onUploadTap,
                       child: Container(
-                        padding: const EdgeInsets.all(8),
+                        margin: const EdgeInsets.only(bottom: 4, right: 4),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.orange[600],
+                          gradient: LinearGradient(
+                              colors: [
+                                Colors.orange[400]!,
+                                Colors.orange[700]!
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight),
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 3),
                           boxShadow: [
                             BoxShadow(
-                                color: Colors.black.withOpacity(0.15),
-                                blurRadius: 5,
-                                offset: const Offset(0, 3))
+                                color: Colors.orange.withOpacity(0.4),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4))
                           ],
                         ),
                         child: const Icon(Icons.camera_alt_rounded,
