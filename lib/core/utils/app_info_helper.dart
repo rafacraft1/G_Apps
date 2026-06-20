@@ -2,15 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 class AppInfoHelper {
-  static String appVersion = "2.0.0";
   static const String copyright = "© 2026 Nurindra. All Rights Reserved.";
-
-  static Future<void> initialize() async {
-    try {
-      PackageInfo packageInfo = await PackageInfo.fromPlatform();
-      appVersion = "${packageInfo.version}+${packageInfo.buildNumber}";
-    } catch (_) {}
-  }
 
   static Widget buildFooter() {
     return Padding(
@@ -27,14 +19,31 @@ class AppInfoHelper {
             ),
           ),
           const SizedBox(height: 2),
-          Text(
-            "Versi $appVersion",
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey.shade400,
-              fontFamily: 'GoogleSans',
-            ),
+          // Menggunakan FutureBuilder agar otomatis mengambil versi pubspec.yaml
+          FutureBuilder<PackageInfo>(
+            future: PackageInfo.fromPlatform(),
+            builder: (context, snapshot) {
+              String versionText = "Memuat versi...";
+
+              if (snapshot.hasData) {
+                // Menampilkan format: Versi 2.0.1+1
+                versionText =
+                    "Versi ${snapshot.data!.version}+${snapshot.data!.buildNumber}";
+              } else if (snapshot.hasError) {
+                // Fallback jika package_info_plus gagal memuat
+                versionText = "Versi 2.0.1+1";
+              }
+
+              return Text(
+                versionText,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey.shade400,
+                  fontFamily: 'GoogleSans',
+                ),
+              );
+            },
           ),
         ],
       ),
