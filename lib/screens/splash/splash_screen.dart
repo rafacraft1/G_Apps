@@ -21,19 +21,38 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _jalankanSplashScreen() async {
-    await Future.delayed(const Duration(seconds: 3));
-    String? token = await SecureStorageHelper.getToken();
+    try {
+      // [UPDATE ZERO ERROR & UX]
+      // Menggunakan Future.wait untuk menjalankan pembacaan token dan
+      // jeda minimum (2 detik) secara paralel (bersamaan).
+      final List<dynamic> results = await Future.wait([
+        SecureStorageHelper.getToken(),
+        Future.delayed(const Duration(seconds: 2)),
+      ]);
 
-    if (!mounted) {
-      return;
-    }
+      // Cegah memory leak: pastikan widget masih aktif sebelum melakukan navigasi
+      if (!mounted) return;
 
-    if (token != null && token.isNotEmpty) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-      );
-    } else {
+      // Hasil pengambilan token berada di index 0 dari Future.wait
+      final String? token = results[0] as String?;
+
+      if (token != null && token.isNotEmpty) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+    } catch (e) {
+      // [FALLBACK ZERO ERROR]
+      // Jika terjadi error pada OS/Storage saat mengambil token,
+      // aplikasi tidak akan freeze, melainkan aman di-routing ke LoginScreen.
+      if (!mounted) return;
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -106,7 +125,7 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Padding(
           padding: const EdgeInsets.only(bottom: 20),
           child: Text(
-            // [UPDATE] Menggunakan variabel dinamis dari AppInfoHelper
+            // Menggunakan variabel dinamis dari AppInfoHelper
             'Versi ${AppInfoHelper.appVersion} - ${AppInfoHelper.copyright}',
             textAlign: TextAlign.center,
             style: TextStyle(
