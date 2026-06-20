@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../core/api/api_client.dart';
 import '../core/api/api_endpoints.dart';
 import '../core/utils/secure_storage_helper.dart';
+import '../core/utils/dialog_helper.dart'; // [TAMBAHAN BARU]
 import 'tracking_service.dart';
 
 @pragma('vm:entry-point')
@@ -57,28 +58,38 @@ class NotificationService {
       return;
     }
 
-    if (tipe == "Layar Aktif (Foreground)" && message.notification != null) {
+    if (message.notification != null) {
       RemoteNotification notification = message.notification!;
       AndroidNotification? android = message.notification?.android;
 
       if (android != null) {
-        _plugin.show(
-          notification.hashCode,
-          notification.title,
-          notification.body,
-          NotificationDetails(
-            android: AndroidNotificationDetails(
-              _channel.id,
-              _channel.name,
-              channelDescription: _channel.description,
-              icon: '@mipmap/launcher_icon',
-              importance: Importance.max,
-              priority: Priority.high,
-              enableVibration: true,
-              playSound: true,
+        if (tipe == "Layar Aktif (Foreground)") {
+          // [UPDATE UX] Tampilkan SnackBar mengambang di dalam aplikasi
+          DialogHelper.showSnackBar(
+            "${notification.title}\n${notification.body}",
+            isSuccess: false,
+            isError: false,
+          );
+        } else {
+          // [UPDATE UX] Tetap gunakan notifikasi sistem jika di background
+          _plugin.show(
+            notification.hashCode,
+            notification.title,
+            notification.body,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                _channel.id,
+                _channel.name,
+                channelDescription: _channel.description,
+                icon: '@mipmap/launcher_icon',
+                importance: Importance.max,
+                priority: Priority.high,
+                enableVibration: true,
+                playSound: true,
+              ),
             ),
-          ),
-        );
+          );
+        }
       }
     }
   }

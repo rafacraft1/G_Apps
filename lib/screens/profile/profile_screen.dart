@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../core/utils/secure_storage_helper.dart';
+import '../../core/utils/app_info_helper.dart'; // [TAMBAHAN BARU] Import AppInfoHelper
 
 import '../auth/login_screen.dart';
 import '../izin/riwayat_izin_screen.dart';
@@ -255,7 +256,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           const SizedBox(height: 32),
                           SecurityMenu(onResetTap: _ajukanReset),
-                          const SizedBox(height: 40),
+                          const SizedBox(height: 20),
+                          // [TAMBAHAN BARU] Footer diletakkan di akhir layar profil
+                          Center(child: AppInfoHelper.buildFooter()),
+                          const SizedBox(height: 20),
                         ],
                       ),
                     ),

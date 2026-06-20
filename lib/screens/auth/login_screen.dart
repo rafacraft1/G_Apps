@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import '../../providers/auth_provider.dart';
+import '../../core/utils/app_info_helper.dart'; // [TAMBAHAN BARU]
 import '../home/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -464,17 +465,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 32),
+                    // [UPDATE] Widget AppInfoHelper terintegrasi dengan animasi opacity
                     AnimatedOpacity(
                       duration: const Duration(milliseconds: 1000),
                       opacity: _isVisible ? 1.0 : 0.0,
-                      child: Text(
-                        'SMKN 1 TGB © 2026',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      child: AppInfoHelper.buildFooter(),
                     ),
                   ],
                 ),

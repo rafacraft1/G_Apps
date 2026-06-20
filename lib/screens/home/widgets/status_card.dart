@@ -9,8 +9,15 @@ class StatusCard extends StatelessWidget {
   final String jamPulangServer;
   final double? jarakMeter;
   final bool isMemuatLokasi;
-  // PENAMBAHAN: Parameter baru untuk menerima nama zona dari Home Screen
   final String namaZona;
+
+  // [TAMBAHAN BARU] Parameter untuk Tombol Absen terintegrasi
+  final bool isTombolDisable;
+  final Color warnaTombol;
+  final IconData iconTombol;
+  final String labelTombol;
+  final String subLabel;
+  final VoidCallback onAbsenTap;
 
   const StatusCard({
     super.key,
@@ -23,6 +30,12 @@ class StatusCard extends StatelessWidget {
     required this.jarakMeter,
     required this.isMemuatLokasi,
     required this.namaZona,
+    required this.isTombolDisable,
+    required this.warnaTombol,
+    required this.iconTombol,
+    required this.labelTombol,
+    required this.subLabel,
+    required this.onAbsenTap,
   });
 
   @override
@@ -44,6 +57,7 @@ class StatusCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -111,6 +125,8 @@ class StatusCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 20),
+
+            // Indikator Radar Lokasi
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -141,7 +157,6 @@ class StatusCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // PERUBAHAN: Teks menampilkan Nama Zona yang reaktif
                         Text(
                           namaZona,
                           style: const TextStyle(
@@ -171,6 +186,52 @@ class StatusCard extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // [TAMBAHAN BARU] Tombol Presensi terintegrasi di dalam Card
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: onAbsenTap,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: warnaTombol,
+                  foregroundColor: Colors.white,
+                  elevation: isTombolDisable ? 0 : 2,
+                  shadowColor: warnaTombol.withOpacity(0.4),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(iconTombol,
+                        color: isTombolDisable ? Colors.white70 : Colors.white),
+                    const SizedBox(width: 12),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(labelTombol,
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: isTombolDisable
+                                    ? Colors.white70
+                                    : Colors.white)),
+                        Text(subLabel,
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: isTombolDisable
+                                    ? Colors.white60
+                                    : Colors.white70)),
+                      ],
+                    )
+                  ],
+                ),
               ),
             ),
           ],

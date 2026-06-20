@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/izin_provider.dart';
+import '../../core/utils/app_info_helper.dart'; // [TAMBAHAN BARU]
 
 class RiwayatIzinScreen extends StatefulWidget {
   const RiwayatIzinScreen({super.key});
@@ -32,14 +33,30 @@ class _RiwayatIzinScreenState extends State<RiwayatIzinScreen> {
       body: Consumer<IzinProvider>(
         builder: (context, provider, child) {
           if (provider.listRiwayat.isEmpty) {
-            return const Center(child: Text('Belum ada data pengajuan izin.'));
+            return Column(
+              children: [
+                const Expanded(
+                  child: Center(child: Text('Belum ada data pengajuan izin.')),
+                ),
+                AppInfoHelper.buildFooter(), // Menempel di bawah jika kosong
+              ],
+            );
           }
 
           return ListView.separated(
             padding: const EdgeInsets.all(20),
-            itemCount: provider.listRiwayat.length,
+            itemCount: provider.listRiwayat.length +
+                1, // [UPDATE] +1 untuk item footer
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
+              // Jika ini index terakhir, render Footer
+              if (index == provider.listRiwayat.length) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 20),
+                  child: Center(child: AppInfoHelper.buildFooter()),
+                );
+              }
+
               final item = provider.listRiwayat[index];
               Color statusColor = Colors.orange;
               if (item['status'] == 'Approved') statusColor = Colors.green;

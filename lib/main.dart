@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import 'core/utils/dialog_helper.dart'; // [TAMBAHAN BARU]
 import 'services/notification_service.dart';
 
 import 'providers/auth_provider.dart';
@@ -42,6 +43,8 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Sistem Absensi Geofence',
         navigatorKey: navigatorKey,
+        scaffoldMessengerKey: DialogHelper
+            .scaffoldKey, // [TAMBAHAN BARU] Registrasi SnackBar Global
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),

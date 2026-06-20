@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../providers/izin_provider.dart';
+import '../../core/utils/app_info_helper.dart'; // [TAMBAHAN BARU]
 
 class AjukanIzinScreen extends StatefulWidget {
   const AjukanIzinScreen({super.key});
@@ -160,14 +161,13 @@ class _AjukanIzinScreenState extends State<AjukanIzinScreen> {
                       fontWeight: FontWeight.w600,
                       color: Colors.black54)),
               const SizedBox(height: 8),
-              // PERBAIKAN: Menggunakan Wrap agar tombol tidak overflow jika layar kecil
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 children: [
                   _buildTypeChip('Sakit'),
                   _buildTypeChip('Izin'),
-                  _buildTypeChip('Dispensasi'), // <-- MENU BARU
+                  _buildTypeChip('Dispensasi'),
                 ],
               ),
               const SizedBox(height: 24),
@@ -245,6 +245,9 @@ class _AjukanIzinScreenState extends State<AjukanIzinScreen> {
                           color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
               ),
+              const SizedBox(height: 32),
+              // [TAMBAHAN BARU] Footer diletakkan di akhir layar pengajuan izin
+              Center(child: AppInfoHelper.buildFooter()),
             ],
           ),
         ),

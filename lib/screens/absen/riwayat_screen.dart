@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // <-- Jangan lupa import dotenv
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../providers/absensi_provider.dart';
+import '../../core/utils/app_info_helper.dart'; // [TAMBAHAN BARU]
 
 class RiwayatScreen extends StatefulWidget {
   const RiwayatScreen({super.key});
@@ -11,7 +12,6 @@ class RiwayatScreen extends StatefulWidget {
 }
 
 class _RiwayatScreenState extends State<RiwayatScreen> {
-  // Ambil BASE_URL dari .env secara dinamis untuk memuat gambar
   final String _baseUrl = dotenv.env['BASE_URL']?.replaceAll('/api/v1', '') ??
       'http://192.168.0.105:8080';
 
@@ -23,7 +23,6 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
     });
   }
 
-  // === FUNGSI BANTUAN UNTUK WARNA & TEKS STATUS ===
   Widget _buildStatusBadge(String? statusDb) {
     String text = 'Alpa';
     Color color = Colors.red[600]!;
@@ -64,7 +63,6 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
     );
   }
 
-  // === FUNGSI BANTUAN UNTUK FOTO & KOORDINAT ===
   Widget _buildDetailAbsen({
     required String title,
     required String? waktu,
@@ -93,8 +91,6 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
             ],
           ),
           const SizedBox(height: 8),
-
-          // Jam
           Text(
             waktu ?? '--:--',
             style: const TextStyle(
@@ -104,8 +100,6 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
             ),
           ),
           const SizedBox(height: 8),
-
-          // Koordinat
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -123,8 +117,6 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
             ],
           ),
           const SizedBox(height: 12),
-
-          // --- KEMBALIKAN BAGIAN FOTO SELFIE ---
           Container(
             height: 100,
             width: double.infinity,
@@ -137,7 +129,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
               borderRadius: BorderRadius.circular(12),
               child: foto != null && foto.isNotEmpty
                   ? Image.network(
-                      '$_baseUrl/uploads/absensi/$foto', // Tarik gambar dari server CI4
+                      '$_baseUrl/uploads/absensi/$foto',
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
                         return Column(
@@ -194,36 +186,56 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
       body: Consumer<AbsensiProvider>(
         builder: (context, provider, child) {
           if (provider.isLoadingRiwayat) {
-            return const Center(child: CircularProgressIndicator());
+            return Column(
+              children: [
+                const Expanded(
+                    child: Center(child: CircularProgressIndicator())),
+                AppInfoHelper.buildFooter(),
+              ],
+            );
           }
 
           if (provider.listRiwayat.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.history_rounded,
-                      size: 80, color: Colors.grey[300]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Belum ada riwayat absensi',
-                    style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[500],
-                        fontWeight: FontWeight.w500),
+            return Column(
+              children: [
+                Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.history_rounded,
+                            size: 80, color: Colors.grey[300]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Belum ada riwayat absensi',
+                          style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[500],
+                              fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
+                ),
+                AppInfoHelper.buildFooter(),
+              ],
             );
           }
 
           return ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: provider.listRiwayat.length,
+            itemCount: provider.listRiwayat.length +
+                1, // [UPDATE] +1 untuk item footer
             itemBuilder: (context, index) {
-              final item = provider.listRiwayat[index];
+              // Render Footer jika index mencapai batas array data
+              if (index == provider.listRiwayat.length) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Center(child: AppInfoHelper.buildFooter()),
+                );
+              }
 
-              // Formatting Tanggal (Dari YYYY-MM-DD ke DD/MM/YYYY)
+              final item = provider.listRiwayat[index];
               String tanggalIndo = item['tanggal'] ?? '';
               if (tanggalIndo.isNotEmpty) {
                 final parts = tanggalIndo.split('-');
@@ -244,7 +256,6 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      // === HEADER: TANGGAL & STATUS ===
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -266,20 +277,17 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                           _buildStatusBadge(item['status']),
                         ],
                       ),
-
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 16),
                         child: Divider(height: 1, thickness: 1),
                       ),
-
-                      // === BODY: DETAIL MASUK & PULANG ===
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildDetailAbsen(
                             title: 'Absen Masuk',
                             waktu: item['jam_masuk'],
-                            foto: item['foto_masuk'], // Menangkap foto masuk
+                            foto: item['foto_masuk'],
                             lat: item['lat_masuk']?.toString(),
                             lon: item['long_masuk']?.toString(),
                             icon: Icons.login_rounded,
@@ -287,14 +295,14 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                           ),
                           Container(
                             width: 1,
-                            height: 180, // Disesuaikan agar muat foto
+                            height: 180,
                             color: Colors.grey[200],
                             margin: const EdgeInsets.symmetric(horizontal: 16),
                           ),
                           _buildDetailAbsen(
                             title: 'Absen Pulang',
                             waktu: item['jam_pulang'],
-                            foto: item['foto_pulang'], // Menangkap foto pulang
+                            foto: item['foto_pulang'],
                             lat: item['lat_pulang']?.toString(),
                             lon: item['long_pulang']?.toString(),
                             icon: Icons.logout_rounded,
@@ -302,8 +310,6 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                           ),
                         ],
                       ),
-
-                      // Keterangan Telat (Jika Ada)
                       if (item['menit_telat'] != null &&
                           int.tryParse(item['menit_telat'].toString()) !=
                               null &&

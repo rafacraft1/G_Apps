@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import '../../core/utils/secure_storage_helper.dart';
+import '../../core/utils/app_info_helper.dart'; // [TAMBAHAN BARU]
 import '../auth/login_screen.dart';
 import '../home/home_screen.dart';
 
@@ -105,7 +106,8 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Padding(
           padding: const EdgeInsets.only(bottom: 20),
           child: Text(
-            'Versi 2.0.1 - © 2026 Nurindra.',
+            // [UPDATE] Menggunakan variabel dinamis dari AppInfoHelper
+            'Versi ${AppInfoHelper.appVersion} - ${AppInfoHelper.copyright}',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withOpacity(0.6),
