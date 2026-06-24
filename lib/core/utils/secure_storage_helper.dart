@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -21,20 +22,48 @@ class SecureStorageHelper {
     await _secureStorage.write(key: _keyRefreshToken, value: refresh);
   }
 
-  static Future<String?> getToken() async =>
-      await _secureStorage.read(key: _keyToken);
-  static Future<String?> getRefreshToken() async =>
-      await _secureStorage.read(key: _keyRefreshToken);
+  static Future<String?> getToken() async {
+    try {
+      return await _secureStorage.read(key: _keyToken);
+    } on PlatformException catch (_) {
+      await clearAll();
+      return null;
+    }
+  }
+
+  static Future<String?> getRefreshToken() async {
+    try {
+      return await _secureStorage.read(key: _keyRefreshToken);
+    } on PlatformException catch (_) {
+      await clearAll();
+      return null;
+    }
+  }
 
   static Future<void> saveUserId(String id) async =>
       await _secureStorage.write(key: _keyUserId, value: id);
-  static Future<String?> getUserId() async =>
-      await _secureStorage.read(key: _keyUserId);
+
+  static Future<String?> getUserId() async {
+    try {
+      return await _secureStorage.read(key: _keyUserId);
+    } on PlatformException catch (_) {
+      await clearAll();
+      return null;
+    }
+  }
 
   static Future<void> setBoundUser(String nis) async =>
       await _secureStorage.write(key: _keyBoundUser, value: nis);
-  static Future<String?> getBoundUser() async =>
-      await _secureStorage.read(key: _keyBoundUser);
+
+  static Future<String?> getBoundUser() async {
+    try {
+      return await _secureStorage.read(key: _keyBoundUser);
+    } on PlatformException catch (_) {
+      await clearAll();
+      return null;
+    }
+  }
+
   static Future<void> clearDeviceBinding() async =>
       await _secureStorage.delete(key: _keyBoundUser);
 
