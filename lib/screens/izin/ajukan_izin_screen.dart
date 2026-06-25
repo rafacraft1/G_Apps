@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../providers/izin_provider.dart';
 import '../../core/utils/app_info_helper.dart';
+import '../../core/utils/image_helper.dart'; // [TAMBAHAN] Import ImageHelper Anda
 
 class AjukanIzinScreen extends StatefulWidget {
   const AjukanIzinScreen({super.key});
@@ -20,6 +21,7 @@ class _AjukanIzinScreenState extends State<AjukanIzinScreen> {
   DateTime? _tglSelesai;
   String _jenisIzin = 'Sakit';
   File? _fotoBukti;
+  bool _isCompressing = false; // [TAMBAHAN] Indikator loading saat kompresi
 
   final ImagePicker _picker = ImagePicker();
 
@@ -61,14 +63,111 @@ class _AjukanIzinScreenState extends State<AjukanIzinScreen> {
     }
   }
 
-  Future<void> _ambilFoto() async {
+  // --- [UPDATE] Integrasi ImageHelper dari file Anda ---
+  Future<void> _ambilFoto(ImageSource source) async {
     final XFile? image = await _picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 50,
+      source: source,
+      imageQuality: 80, // Kompresi tahap 1 dari bawaan
     );
+
     if (image != null) {
-      setState(() => _fotoBukti = File(image.path));
+      setState(() => _isCompressing = true);
+
+      // Kompresi tahap 2 (Ekstrem & Resize menggunakan image_helper.dart Anda)
+      File originalFile = File(image.path);
+      File? compressedFile = await ImageHelper.compressImage(originalFile);
+
+      if (!mounted) return;
+      setState(() {
+        // Jika compressImage return null (misal error), fallback ke file asli
+        _fotoBukti = compressedFile ?? originalFile;
+        _isCompressing = false;
+      });
     }
+  }
+
+  // --- Bottom Sheet gaya iOS untuk memilih sumber foto ---
+  void _tampilkanPilihanFoto() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext bc) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            child: Wrap(
+              children: <Widget>[
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 12, bottom: 8),
+                    height: 5,
+                    width: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(24, 16, 24, 16),
+                  child: Text(
+                    'Lampirkan Bukti Foto',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black87),
+                  ),
+                ),
+                ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                        color: Colors.blue.shade50, shape: BoxShape.circle),
+                    child: Icon(Icons.camera_alt_rounded,
+                        color: Colors.blue.shade600, size: 24),
+                  ),
+                  title: const Text('Ambil dari Kamera',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                  trailing: Icon(Icons.chevron_right_rounded,
+                      color: Colors.grey[400]),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _ambilFoto(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                        color: Colors.orange.shade50, shape: BoxShape.circle),
+                    child: Icon(Icons.photo_library_rounded,
+                        color: Colors.orange.shade600, size: 24),
+                  ),
+                  title: const Text('Pilih dari Galeri',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                  trailing: Icon(Icons.chevron_right_rounded,
+                      color: Colors.grey[400]),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _ambilFoto(ImageSource.gallery);
+                  },
+                ),
+                const SizedBox(height: 32),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _submit() async {
@@ -290,8 +389,15 @@ class _AjukanIzinScreenState extends State<AjukanIzinScreen> {
                             fontWeight: FontWeight.w800,
                             color: Colors.black87)),
                     const SizedBox(height: 12),
+
+                    // --- [UPDATE] UI Loading indikator saat kompresi berjalan ---
                     GestureDetector(
-                      onTap: _ambilFoto,
+                      onTap: () {
+                        // Kunci fungsi tap jika sedang compress
+                        if (!_isCompressing) {
+                          _tampilkanPilihanFoto();
+                        }
+                      },
                       child: Container(
                         height: 160,
                         width: double.infinity,
@@ -307,49 +413,55 @@ class _AjukanIzinScreenState extends State<AjukanIzinScreen> {
                               style: BorderStyle.solid,
                               width: 1.5),
                         ),
-                        child: _fotoBukti != null
-                            ? Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: Image.file(_fotoBukti!,
-                                        fit: BoxFit.cover,
-                                        color: Colors.black.withOpacity(0.2),
-                                        colorBlendMode: BlendMode.darken),
-                                  ),
-                                  const Center(
-                                    child: Icon(Icons.autorenew_rounded,
-                                        color: Colors.white, size: 32),
-                                  ),
-                                ],
+                        child: _isCompressing
+                            ? const Center(
+                                child: CircularProgressIndicator(),
                               )
-                            : Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.blue.withOpacity(0.1),
-                                            blurRadius: 10,
-                                            offset: const Offset(0, 4),
-                                          )
-                                        ]),
-                                    child: Icon(Icons.add_a_photo_rounded,
-                                        size: 28, color: Colors.blue[600]),
+                            : _fotoBukti != null
+                                ? Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: Image.file(_fotoBukti!,
+                                            fit: BoxFit.cover,
+                                            color:
+                                                Colors.black.withOpacity(0.2),
+                                            colorBlendMode: BlendMode.darken),
+                                      ),
+                                      const Center(
+                                        child: Icon(Icons.autorenew_rounded,
+                                            color: Colors.white, size: 32),
+                                      ),
+                                    ],
+                                  )
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.blue
+                                                    .withOpacity(0.1),
+                                                blurRadius: 10,
+                                                offset: const Offset(0, 4),
+                                              )
+                                            ]),
+                                        child: Icon(Icons.add_a_photo_rounded,
+                                            size: 28, color: Colors.blue[600]),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text('Ketuk untuk melampirkan surat',
+                                          style: TextStyle(
+                                              color: Colors.blue[700],
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600)),
+                                    ],
                                   ),
-                                  const SizedBox(height: 12),
-                                  Text('Ketuk untuk memotret surat',
-                                      style: TextStyle(
-                                          color: Colors.blue[700],
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600)),
-                                ],
-                              ),
                       ),
                     ),
                   ],

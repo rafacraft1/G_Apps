@@ -10,6 +10,7 @@ import '../../core/utils/app_info_helper.dart';
 
 import '../auth/login_screen.dart';
 import '../izin/riwayat_izin_screen.dart';
+import '../about/about_screen.dart'; // [TAMBAHAN BARU] Import halaman About
 import 'widgets/profile_card.dart';
 import 'widgets/security_menu.dart';
 
@@ -65,7 +66,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // --- UI/UX UPDATE: Bottom Sheet bergaya modern (iOS Style) ---
   void _tampilkanPilihanFoto() {
     showModalBottomSheet(
       context: context,
@@ -79,7 +79,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: SafeArea(
             child: Wrap(
               children: <Widget>[
-                // Drag handle (Pill)
                 Center(
                   child: Container(
                     margin: const EdgeInsets.only(top: 12, bottom: 8),
@@ -193,7 +192,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // --- UI/UX UPDATE: Dialog konfirmasi yang lebih soft ---
   void _ajukanReset() {
     showDialog(
       context: context,
@@ -309,7 +307,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: const Color(0xFFF8F9FA),
       body: Stack(
         children: [
-          // --- UI/UX UPDATE: Premium Gradient Background Header ---
           Positioned(
             top: 0,
             left: 0,
@@ -349,7 +346,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
-
           SafeArea(
             bottom: false,
             child: Column(
@@ -378,7 +374,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   letterSpacing: 0.5)),
                         ),
                       ),
-                      const SizedBox(width: 48), // Balancing width
+                      const SizedBox(width: 48),
                     ],
                   ),
                 ),
@@ -432,6 +428,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           SecurityMenu(onResetTap: _ajukanReset),
+
+                          // [TAMBAHAN BARU] Section & Menu Navigasi Tentang Aplikasi
+                          const SizedBox(height: 28),
+                          const Padding(
+                            padding: EdgeInsets.only(left: 4, bottom: 12),
+                            child: Text(
+                              'Informasi Aplikasi',
+                              style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.black87),
+                            ),
+                          ),
+                          _AnimatedProfileMenu(
+                            icon: Icons.info_outline_rounded,
+                            title: 'Tentang Aplikasi',
+                            subtitle: 'Informasi versi dan instansi',
+                            color: Colors.blue,
+                            onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const AboutScreen())),
+                          ),
+
                           const SizedBox(height: 40),
                           Center(child: AppInfoHelper.buildFooter()),
                           const SizedBox(height: 30),
@@ -449,7 +469,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-// --- UI/UX UPDATE: Menu dengan animasi pantulan (Bouncy Effect) ---
 class _AnimatedProfileMenu extends StatefulWidget {
   final IconData icon;
   final String title;
